@@ -283,8 +283,24 @@
         .tier-list {
             display: flex;
             flex-direction: column;
-            gap: 3px;
-            min-height: 132px
+            gap: 2px;
+            min-height: 188px
+        }
+
+        .rank-gap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 3px 0 4px;
+            pointer-events: none;
+            user-select: none;
+            color: rgba(147, 165, 194, .7);
+            font-size: 15px;
+            font-weight: 900;
+            line-height: .42;
+            letter-spacing: 0;
         }
 
         .item {
@@ -689,12 +705,33 @@
                 const el = items.find(x => x.dataset.candidate === c);
                 if (el) listEl.appendChild(el);
             });
+            ensureGaps(listEl);
             items.forEach(el => flipTo(el, oldRects[el.dataset.candidate]));
         }
 
         function itemHTML(x, key, draggable) {
             const drag = draggable === false ? 'false' : 'true';
             return `<div class="item ${x}" draggable="${drag}" data-candidate="${x}" data-key="${key}">${x}</div>`;
+        }
+
+        function gapHTML() {
+            return `<div class="rank-gap" aria-hidden="true">·<br>·<br>·</div>`;
+        }
+
+        function tierHTML(rank, keyPrefix, draggable) {
+            return rank.map((c, i) =>
+                itemHTML(c, `${keyPrefix}-${c}`, draggable) + (i < rank.length - 1 ? gapHTML() : '')
+            ).join('');
+        }
+
+        function ensureGaps(listEl) {
+            if (!listEl) return;
+            listEl.querySelectorAll('.rank-gap').forEach(g => g.remove());
+            const items = [...listEl.querySelectorAll('.item')];
+            items.forEach((el, i) => {
+                if (i === items.length - 1) return;
+                el.insertAdjacentHTML('afterend', gapHTML());
+            });
         }
 
         function resultRankOf(pi) {
@@ -759,7 +796,7 @@
                         <div class="voter-head" draggable="true">
                             <span class="voter-num">V${voter.id}</span>
                         </div>
-                        <div class="tier-list">${voter.rank.map(c => itemHTML(c, `v-${pi}-${voter.id}-${c}`)).join('')}</div>
+                        <div class="tier-list">${tierHTML(voter.rank, `v-${pi}-${voter.id}`)}</div>
                     </div>
                 `).join('');
 
@@ -785,7 +822,7 @@
                                 <span class="voter-num">Result</span>
                             </div>
                             <div class="tier-list">
-                                ${resultRank.map(c => itemHTML(c, `r-${pi}-${c}`, false)).join('')}
+                                ${tierHTML(resultRank, `r-${pi}`, false)}
                             </div>
                         </div>
                     </div>

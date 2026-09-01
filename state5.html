@@ -196,7 +196,7 @@
         render();
         M.checkBackend().then(ok => {
             if (!ok) {
-                statusEl.textContent = 'سرور در دسترس نیست. python llm.py را اجرا کنید و این صفحه را از http://127.0.0.1:8765/index.html باز کنید.';
+                statusEl.textContent = 'API در دسترس نیست. برای اجرای محلی python llm.py را اجرا کنید. روی Vercel متغیر ORCAROUTER_API_KEY را تنظیم کنید.';
             }
         });
     </script>

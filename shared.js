@@ -840,7 +840,7 @@
     ];
 
     const API_BASES = ['http://127.0.0.1:8765', 'http://localhost:8765'];
-    const FETCH_FAIL = 'اتصال به سرور برقرار نشد. python llm.py را اجرا کنید و صفحه را از http://127.0.0.1:8765/index.html باز کنید.';
+    const FETCH_FAIL = 'اتصال به API برقرار نشد. برای اجرای محلی python llm.py را اجرا کنید. روی Vercel متغیر ORCAROUTER_API_KEY را در تنظیمات پروژه بگذارید.';
 
     function apiBases() {
         const bases = [];
@@ -864,7 +864,7 @@
                 try { data = await res.json(); } catch (e) { data = {}; }
                 if (!res.ok) {
                     if (data && data.error) throw new Error(data.error);
-                    lastErr = new Error('درخواست ناموفق بود. python llm.py را دوباره اجرا کنید.');
+                    lastErr = new Error('درخواست ناموفق بود. python llm.py را دوباره اجرا کنید یا استقرار Vercel را بررسی کنید.');
                     continue;
                 }
                 return data;
