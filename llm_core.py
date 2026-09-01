@@ -12,7 +12,7 @@ MODEL_NAME = "deepseek/deepseek-v4-flash-free"
 CRITERIA_KEYS = ["AAW", "CWC", "UNAN", "MONO", "IIA"]
 PLACEHOLDER_KEYS = {"", "your_orcarouter_api_key_here", "changeme"}
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent
 ENV_PATH = ROOT / ".env"
 
 CRITERIA_SYSTEM_PROMPT = """

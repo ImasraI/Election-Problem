@@ -4,7 +4,7 @@ import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from api._llm import (
+from llm_core import (
     MODEL_NAME,
     evaluate_criteria,
     generate_examples,
@@ -18,6 +18,7 @@ from api._llm import (
 HOST = "0.0.0.0"
 PORT = 8765
 ROOT = Path(__file__).resolve().parent
+STATIC = ROOT / "public"
 
 
 def prompt_for_api_key() -> str:
@@ -47,7 +48,7 @@ def require_api_key() -> str:
 
 class AppHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(ROOT), **kwargs)
+        super().__init__(*args, directory=str(STATIC), **kwargs)
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
