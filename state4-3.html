@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۴.۳ – اجماع</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <h2 class="cond-title">اجماع / پارتو (UNAN)</h2>
+
+        <div class="card">
+            <div class="card-header"><span>نامزدها و آرا</span></div>
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">مثال اجماع روی A نسبت به B</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                <div class="voter-list" id="voterList"></div>
+            </div>
+            <div class="card">
+                <div id="pareto"></div>
+                <div class="graph-wrap" style="margin-top:10px;"><canvas id="graphCanvas" width="480" height="480"></canvas></div>
+                <div class="graph-legend" id="graphLegend"></div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script>
+        const M = Mentor;
+        const SIX = ['A','B','C','D','E','F'];
+        const EXAMPLE = M.expandGroups([
+            { n: 3, rank: 'A>C>D>E>F>B' },
+            { n: 2, rank: 'A>D>C>E>F>B' },
+            { n: 2, rank: 'A>E>C>D>F>B' }
+        ]);
+        function allPrefer(voters, x, y) {
+            if (!voters.length) return false;
+            return voters.every(rank => {
+                const list = M.parseRanking(rank);
+                return list.indexOf(x) !== -1 && list.indexOf(y) !== -1 && list.indexOf(x) < list.indexOf(y);
+            });
+        }
+        const lab = M.createLab({
+            candidates: SIX,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            highlightCondorcet: true,
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const cw = counts ? M.hasCondorcet(counts, cands) : null;
+                const el = document.getElementById('pareto');
+                if (!lab.state.voters.length) { el.innerHTML = '<div class="empty-state">رأی اضافه کنید.</div>'; return; }
+                let html = '';
+                for (let i = 0; i < cands.length; i++) {
+                    for (let j = 0; j < cands.length; j++) {
+                        if (i === j) continue;
+                        if (allPrefer(lab.state.voters, cands[i], cands[j])) {
+                            html += `<div class="result-box win">همه ${cands[i]} را به ${cands[j]} ترجیح می‌دهند → ${cands[j]} نباید برنده شود.</div>`;
+                        }
+                    }
+                }
+                if (!html) html = '<div class="result-box info">در این آرا اجماع کامل روی هیچ جفتی نیست. مثال را بارگذاری کنید.</div>';
+                html += `<p style="margin-top:8px;font-size:14px;">برنده مقایسه دوبه‌دو: <strong>${cw || '—'}</strong></p>`;
+                el.innerHTML = html;
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => {
+            lab.setCandidates(SIX);
+            lab.setVoters(EXAMPLE, true);
+        });
+        lab.setVoters(EXAMPLE, true);
+    </script>
+</body>
+</html>

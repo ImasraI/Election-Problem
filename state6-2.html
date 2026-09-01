@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۶.۲ – اکثریت</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <h2 class="cond-title">روش اکثریت (فقط رأی اول)</h2>
+        <div id="chart"></div>
+        <div class="card">
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">مثال نقض کندورسه</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                </div>
+                <div>
+                    <div id="bars"></div>
+                    <div id="out"></div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="460" height="460"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script>
+        const M = Mentor;
+        const SIX = ['A','B','C','D','E','F'];
+        const EXAMPLE = M.expandGroups([
+            { n: 5, rank: 'A>C>B>D>E>F' },
+            { n: 4, rank: 'B>C>D>E>A>F' },
+            { n: 3, rank: 'D>C>E>B>A>F' },
+            { n: 2, rank: 'E>C>D>B>A>F' },
+            { n: 3, rank: 'C>A>B>D>E>F' }
+        ]);
+        M.renderCriteriaChart(document.getElementById('chart'), {
+            AAW: true, CWC: false, UNAN: true, MONO: true, IIA: false
+        }, {
+            title: 'نمودار ازپیش‌آماده‌شده',
+            examples: [
+                { rule: 'CWC', title: 'رأی اول با برنده کندورسه یکی نیست', ballots: ['۵ نفر: A ≻ C ≻ B ≻ D ≻ E', '۴ نفر: B ≻ C ≻ …', '۳ نفر: C ≻ A ≻ …'], result: 'اکثریت A را برنده می‌کند؛ کندورسه C است.', why: 'فقط رأی اول، پیروزی‌های دونفره C را نمی‌بیند.' },
+                { rule: 'IIA', title: 'جابه‌جایی C نتیجه A و B را عوض می‌کند', ballots: ['قبل: A برنده است', 'بعد: فقط C جابه‌جا می‌شود و B برنده می‌شود'], result: 'نتیجه A در برابر B به نامزد سوم وابسته شد.', why: 'شرط استقلال نقض می‌شود.' }
+            ]
+        });
+        const lab = M.createLab({
+            candidates: SIX,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const pl = M.plurality(lab.state.voters, cands);
+                const cw = counts ? M.hasCondorcet(counts, cands) : null;
+                if (pl.counts) M.renderScoreBars(document.getElementById('bars'), pl.counts, cands);
+                M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: pl.winner });
+                const el = document.getElementById('out');
+                if (!lab.state.voters.length) { el.innerHTML = ''; return; }
+                el.innerHTML = `<div class="result-box win">برنده رأیِ اول: ${pl.winner}</div>` +
+                    (cw && cw !== pl.winner ? `<div class="result-box loss">برنده کندورسه ${cw} بود.</div>` : '');
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => { lab.setCandidates(SIX); lab.setVoters(EXAMPLE, true); });
+        lab.setVoters(EXAMPLE, true);
+    </script>
+</body>
+</html>

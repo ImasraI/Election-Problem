@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۵ – سنجش ایده‌ها</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <h2>استیت ۵ – ایده‌ها را با پنج شرط بسنجید</h2>
+
+        <div class="card">
+            <div class="card-header">
+                <span>افزودن یا ارزیابی ایده</span>
+                <span class="badge" id="ideaCount">۰ ایده</span>
+            </div>
+            <textarea id="ideaInput" placeholder="روش تازه‌ای بنویسید یا یکی از فهرست را انتخاب کنید"></textarea>
+            <div class="row" style="margin-top:10px;">
+                <button class="primary" id="addIdeaBtn" type="button">ثبت و ارزیابی</button>
+                <button class="outline" id="examplesBtn" type="button">مثال‌های نقض</button>
+                <button class="outline" id="clearIdeasBtn" type="button">حذف همه</button>
+            </div>
+            <div id="evalStatus" class="text-muted" style="margin-top:10px;"></div>
+            <div id="criteriaChart"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span>فهرست روش‌ها (از استیت ۱ و همین‌جا)</span></div>
+            <div id="ideaList"></div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script>
+        const M = Mentor;
+        const input = document.getElementById('ideaInput');
+        const list = document.getElementById('ideaList');
+        const count = document.getElementById('ideaCount');
+        const statusEl = document.getElementById('evalStatus');
+        const chartEl = document.getElementById('criteriaChart');
+        const addBtn = document.getElementById('addIdeaBtn');
+        const examplesBtn = document.getElementById('examplesBtn');
+        let ideas = M.loadIdeas().map(item => typeof item === 'string' ? { text: item, criteria: null } : item);
+        let selected = -1;
+
+        function hasFailed(idea) {
+            return !!(idea && idea.criteria && Object.values(idea.criteria).some(v => !v));
+        }
+        function save() { M.saveIdeas(ideas); render(); }
+
+        function showChart(idea) {
+            if (!idea || !idea.criteria) {
+                M.renderCriteriaChart(chartEl, null, { empty: 'یک ایده را ارزیابی کنید تا نمودار پنج شرط دیده شود.' });
+                return;
+            }
+            M.renderCriteriaChart(chartEl, idea.criteria, {
+                title: 'ارزیابی: «' + idea.text.slice(0, 48) + (idea.text.length > 48 ? '…' : '') + '»',
+                examples: idea.examples || [],
+                examplesFailed: !!(idea.examplesLoaded && !(idea.examples || []).length)
+            });
+        }
+
+        function render() {
+            count.textContent = ideas.length + ' ایده';
+            if (selected >= ideas.length) selected = ideas.length - 1;
+            if (selected < 0 && ideas.length) selected = ideas.length - 1;
+            if (!ideas.length) {
+                list.innerHTML = '<div class="empty-state">در استیت ۱ یا اینجا ایده‌ای ثبت کنید.</div>';
+                M.renderCriteriaChart(chartEl, null, { empty: 'هنوز ایده‌ای نیست.' });
+                examplesBtn.disabled = true;
+                return;
+            }
+            list.innerHTML = ideas.map((item, i) => `
+                <div class="idea-item ${i === selected ? 'active' : ''}" data-select="${i}">
+                    <span class="badge">${i + 1}</span>
+                    <input data-idx="${i}" value="${String(item.text || '').replace(/"/g, '&quot;')}">
+                    <span class="badge ${item.criteria ? (Object.values(item.criteria).every(Boolean) ? 'condorcet' : 'cycle') : ''}">
+                        ${item.criteria ? (Object.values(item.criteria).filter(v => !v).length + ' نقض') : 'بدون ارزیابی'}
+                    </span>
+                    <button class="remove-btn" data-idx="${i}" type="button">✕</button>
+                </div>`).join('');
+            list.querySelectorAll('input').forEach(inp => {
+                inp.addEventListener('click', e => e.stopPropagation());
+                inp.addEventListener('change', () => {
+                    const idx = parseInt(inp.dataset.idx, 10);
+                    ideas[idx].text = inp.value.trim();
+                    ideas[idx].criteria = null;
+                    ideas[idx].examples = [];
+                    ideas[idx].examplesLoaded = false;
+                    save();
+                });
+            });
+            list.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    ideas.splice(parseInt(btn.dataset.idx, 10), 1);
+                    save();
+                });
+            });
+            list.querySelectorAll('[data-select]').forEach(row => {
+                row.addEventListener('click', () => {
+                    selected = parseInt(row.dataset.select, 10);
+                    showChart(ideas[selected]);
+                    if (ideas[selected] && !ideas[selected].criteria) {
+                        statusEl.textContent = 'این ایده هنوز ارزیابی نشده. «ثبت و ارزیابی» را بزنید (کادر بالا می‌تواند خالی باشد).';
+                    }
+                    render();
+                });
+            });
+            if (selected >= 0) showChart(ideas[selected]);
+            else M.renderCriteriaChart(chartEl, null);
+            examplesBtn.disabled = !hasFailed(selected >= 0 ? ideas[selected] : null);
+        }
+
+        async function addAndEvaluate() {
+            const t = input.value.trim();
+            if (!t) {
+                if (selected >= 0 && ideas[selected] && !ideas[selected].criteria) {
+                    await evaluateAt(selected);
+                }
+                return;
+            }
+            addBtn.disabled = true;
+            examplesBtn.disabled = true;
+            statusEl.textContent = 'در حال ارزیابی پنج معیار…';
+            const idea = { text: t, criteria: null, examples: [], examplesLoaded: false };
+            ideas.push(idea);
+            selected = ideas.length - 1;
+            input.value = '';
+            try {
+                const evaluation = await M.evaluateSystem(t);
+                idea.criteria = evaluation.criteria;
+                statusEl.textContent = hasFailed(idea)
+                    ? 'نمودار آماده است. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.'
+                    : '';
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            }
+            addBtn.disabled = false;
+            save();
+            showChart(idea);
+        }
+
+        async function evaluateAt(idx) {
+            const idea = ideas[idx];
+            if (!idea || !idea.text) return;
+            addBtn.disabled = true;
+            examplesBtn.disabled = true;
+            statusEl.textContent = 'در حال ارزیابی پنج معیار…';
+            try {
+                const evaluation = await M.evaluateSystem(idea.text);
+                idea.criteria = evaluation.criteria;
+                idea.examples = [];
+                idea.examplesLoaded = false;
+                statusEl.textContent = hasFailed(idea)
+                    ? 'نمودار آماده است. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.'
+                    : '';
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            }
+            addBtn.disabled = false;
+            save();
+            showChart(idea);
+        }
+
+        async function loadExamples() {
+            const idea = selected >= 0 ? ideas[selected] : null;
+            if (!hasFailed(idea)) {
+                statusEl.textContent = 'ابتدا روشی را ارزیابی کنید که دست‌کم یک شرط نقض‌شده داشته باشد.';
+                return;
+            }
+            examplesBtn.disabled = true;
+            addBtn.disabled = true;
+            statusEl.textContent = 'در حال گرفتن مثال‌های نقض…';
+            try {
+                idea.examples = await M.fetchExamples(idea.text, idea.criteria);
+                idea.examplesLoaded = true;
+                statusEl.textContent = (idea.examples || []).length ? '' : 'برای شرط‌های نقض‌شده مثالی برنگشت.';
+            } catch (err) {
+                idea.examplesLoaded = true;
+                statusEl.textContent = err.message || String(err);
+            }
+            addBtn.disabled = false;
+            save();
+            showChart(idea);
+        }
+
+        addBtn.addEventListener('click', addAndEvaluate);
+        examplesBtn.addEventListener('click', loadExamples);
+        document.getElementById('clearIdeasBtn').addEventListener('click', () => {
+            ideas = [];
+            selected = -1;
+            statusEl.textContent = '';
+            save();
+        });
+        render();
+        M.checkBackend().then(ok => {
+            if (!ok) {
+                statusEl.textContent = 'سرور در دسترس نیست. python llm.py را اجرا کنید و این صفحه را از http://127.0.0.1:8765/index.html باز کنید.';
+            }
+        });
+    </script>
+</body>
+</html>

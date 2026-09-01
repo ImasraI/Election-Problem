@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۴.۲ – معیار کندورسه</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <h2 class="cond-title">معیار کندورسه (CWC)</h2>
+
+        <div class="card">
+            <div class="card-header"><span>نامزدها و آرا</span></div>
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">مثال: کندورسه ≠ اکثریت</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                <div class="voter-list" id="voterList"></div>
+            </div>
+            <div class="card">
+                <div id="cmp"></div>
+                <div id="bars"></div>
+                <div class="graph-wrap" style="margin-top:10px;"><canvas id="graphCanvas" width="480" height="480"></canvas></div>
+                <div class="graph-legend" id="graphLegend"></div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script>
+        const M = Mentor;
+        const FIVE = ['A','B','C','D','E'];
+        const EXAMPLE = M.expandGroups([
+            { n: 5, rank: 'A>C>B>D>E' },
+            { n: 4, rank: 'B>C>D>E>A' },
+            { n: 3, rank: 'D>C>E>B>A' },
+            { n: 2, rank: 'E>C>D>B>A' },
+            { n: 3, rank: 'C>A>B>D>E' }
+        ]);
+        const lab = M.createLab({
+            candidates: FIVE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const cw = counts ? M.hasCondorcet(counts, cands) : null;
+                const pl = M.plurality(lab.state.voters, cands);
+                M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: cw });
+                if (pl.counts) M.renderScoreBars(document.getElementById('bars'), pl.counts, cands);
+                const el = document.getElementById('cmp');
+                if (!lab.state.voters.length) { el.innerHTML = '<div class="empty-state">رأی اضافه کنید.</div>'; return; }
+                const same = cw && cw === pl.winner;
+                el.innerHTML = `
+                    <div class="result-box info">برنده کندورسه: ${cw || 'وجود ندارد'}</div>
+                    <div class="result-box ${same ? 'win' : 'loss'}">برنده رأیِ اول: ${pl.winner || '—'}</div>
+                    <p style="margin-top:8px;font-size:14px;line-height:1.8;">
+                        ${cw && !same ? 'کسی که همه را دونفره می‌برد، در شمارش رأی اول برنده نشده است. معیار کندورسه همین را ممنوع می‌کند.' : ''}
+                        ${same ? 'در این نمونه دو نتیجه یکی است. مثال را بارگذاری کنید تا تفاوت دیده شود.' : ''}
+                        ${!cw ? 'برنده کندورسه وجود ندارد؛ این شرط فقط وقتی معنا دارد که چنین نامزدی باشد.' : ''}
+                    </p>`;
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => {
+            lab.setCandidates(FIVE);
+            lab.setVoters(EXAMPLE, true);
+        });
+        lab.setVoters(EXAMPLE, true);
+    </script>
+</body>
+</html>

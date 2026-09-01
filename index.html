@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>کارگاه انتخاب اجتماعی</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+        body { padding: 16px; display: flex; justify-content: center; }
+        .app {
+            max-width: 1400px; width: 100%;
+            background: linear-gradient(150deg, rgba(var(--c-surface-strong), .82), rgba(var(--c-surface), .68)),
+                        linear-gradient(180deg, rgba(255,255,255,.05), transparent);
+            border: 1px solid rgba(var(--c-border), .16);
+            border-radius: 32px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .5);
+            backdrop-filter: blur(16px);
+            padding: 28px 32px 40px;
+            animation: heroSlideUp .55s cubic-bezier(.4,0,.2,1);
+        }
+        .header {
+            display: flex; flex-wrap: wrap; align-items: center;
+            gap: 12px 20px; margin-bottom: 16px;
+        }
+        .header h1 {
+            font-size: 26px; font-weight: 800; color: var(--c-text);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .header h1 small {
+            font-size: 14px; font-weight: 500; color: var(--c-muted);
+            margin-right: 4px; background: rgba(165, 243, 252, .1);
+            border: 1px solid rgba(165, 243, 252, .22);
+            padding: 3px 12px; border-radius: 999px;
+        }
+        .tab-bar, .sub-tab-bar {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            margin-bottom: 12px; align-items: center;
+        }
+        .tab-bar { border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 10px; }
+        .tab-btn, .sub-tab-btn {
+            background: rgba(255,255,255,.04);
+            border: 1px solid rgba(255,255,255,.08);
+            padding: 8px 16px; font-size: 14px; font-weight: 700;
+            color: var(--c-muted); border-radius: 12px; cursor: pointer;
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+        }
+        .sub-tab-btn { padding: 6px 12px; font-size: 13px; border-radius: 10px; }
+        .tab-btn:hover, .sub-tab-btn:hover { background: rgba(255,255,255,.09); color: var(--c-text); }
+        .tab-btn.active {
+            background: var(--c-cyan-light); color: #041019;
+            border-color: rgba(103, 232, 249, .5);
+            box-shadow: 0 -6px 20px rgba(57, 211, 255, .28);
+        }
+        .sub-tab-btn.active {
+            background: var(--c-amber); color: #1a1204;
+            border-color: rgba(249, 180, 74, .5);
+        }
+        .tab-nav { display: flex; gap: 8px; margin-right: auto; align-items: center; direction: ltr; }
+        .tab-nav button {
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.12);
+            padding: 6px 14px; border-radius: 10px;
+            cursor: pointer; font-weight: 700; color: var(--c-text);
+        }
+        .tab-indicator { font-size: 14px; font-weight: 600; color: var(--c-muted); padding: 0 6px; }
+        .iframe-container {
+            width: 100%; min-height: 700px;
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 18px; overflow: hidden;
+            background: rgba(2, 6, 23, .5);
+        }
+        iframe { width: 100%; height: 700px; border: none; display: block; background: transparent; }
+        .sub-tab-bar.hidden { display: none; }
+        @media (max-width: 600px) {
+            .app { padding: 16px 12px 24px; border-radius: 22px; }
+            .tab-btn { padding: 6px 10px; font-size: 13px; }
+            iframe { height: 500px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <h1>
+                کارگاه انتخاب اجتماعی
+            </h1>
+        </div>
+
+        <div class="tab-bar" id="tabBar"></div>
+        <div class="sub-tab-bar hidden" id="subTabBar"></div>
+
+        <div class="iframe-container">
+            <iframe id="stateFrame" src="state1.html" title="استیت جاری"></iframe>
+        </div>
+    </div>
+
+    <script>
+        const GROUPS = [
+            { id: 's1', label: 'استیت ۱', file: 'state1.html' },
+            { id: 's2', label: 'استیت ۲', file: 'state2.html' },
+            { id: 's3', label: 'استیت ۳', file: 'state3.html' },
+            {
+                id: 's4', label: 'استیت ۴',
+                children: [
+                    { id: 's4-1', label: '۴.۱ همیشه برنده', file: 'state4-1.html' },
+                    { id: 's4-2', label: '۴.۲ معیار کندورسه', file: 'state4-2.html' },
+                    { id: 's4-3', label: '۴.۳ اجماع', file: 'state4-3.html' },
+                    { id: 's4-4', label: '۴.۴ یکنوایی', file: 'state4-4.html' },
+                    { id: 's4-5', label: '۴.۵ استقلال', file: 'state4-5.html' }
+                ]
+            },
+            { id: 's5', label: 'استیت ۵', file: 'state5.html' },
+            {
+                id: 's6', label: 'استیت ۶',
+                children: [
+                    { id: 's6-1', label: 'کندورسه', file: 'state6-1.html' },
+                    { id: 's6-2', label: 'اکثریت', file: 'state6-2.html' },
+                    { id: 's6-3', label: 'بوردا', file: 'state6-3.html' },
+                    { id: 's6-4', label: 'حذف تدریجی', file: 'state6-4.html' },
+                    { id: 's6-5', label: 'زوجی ترتیبی', file: 'state6-5.html' }
+                ]
+            },
+            { id: 's7', label: 'اثبات ارو', file: 'Arrows_therom.html' }
+        ];
+
+        const leaves = [];
+        GROUPS.forEach(g => {
+            if (g.children) g.children.forEach(c => leaves.push({ ...c, group: g.id }));
+            else leaves.push({ ...g, group: g.id });
+        });
+
+        const tabBar = document.getElementById('tabBar');
+        const subTabBar = document.getElementById('subTabBar');
+        const iframe = document.getElementById('stateFrame');
+        let current = 0;
+
+        function renderChrome() {
+            const leaf = leaves[current];
+            tabBar.innerHTML = GROUPS.map(g =>
+                `<button class="tab-btn ${g.id === leaf.group ? 'active' : ''}" data-group="${g.id}">${g.label}</button>`
+            ).join('') + `
+                <div class="tab-nav">
+                    <button id="prevTab" type="button">◀</button>
+                    <span class="tab-indicator">${current + 1} / ${leaves.length}</span>
+                    <button id="nextTab" type="button">▶</button>
+                </div>`;
+            const group = GROUPS.find(g => g.id === leaf.group);
+            if (group.children) {
+                subTabBar.classList.remove('hidden');
+                subTabBar.innerHTML = group.children.map(c =>
+                    `<button class="sub-tab-btn ${c.id === leaf.id ? 'active' : ''}" data-id="${c.id}">${c.label}</button>`
+                ).join('');
+            } else {
+                subTabBar.classList.add('hidden');
+                subTabBar.innerHTML = '';
+            }
+            tabBar.querySelectorAll('[data-group]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const g = GROUPS.find(x => x.id === btn.dataset.group);
+                    const first = g.children ? g.children[0].id : g.id;
+                    switchTo(leaves.findIndex(l => l.id === first));
+                });
+            });
+            subTabBar.querySelectorAll('[data-id]').forEach(btn => {
+                btn.addEventListener('click', () => switchTo(leaves.findIndex(l => l.id === btn.dataset.id)));
+            });
+            document.getElementById('prevTab').addEventListener('click', () => switchTo(current - 1));
+            document.getElementById('nextTab').addEventListener('click', () => switchTo(current + 1));
+        }
+
+        function switchTo(index) {
+            if (index < 0 || index >= leaves.length) return;
+            current = index;
+            iframe.src = leaves[index].file;
+            renderChrome();
+        }
+
+        iframe.addEventListener('load', () => {
+            try {
+                const h = iframe.contentWindow.document.body.scrollHeight;
+                if (h > 100) iframe.style.height = Math.max(700, h + 40) + 'px';
+            } catch (e) { /* ignore */ }
+        });
+
+        renderChrome();
+        switchTo(0);
+    </script>
+</body>
+</html>

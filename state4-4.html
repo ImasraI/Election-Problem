@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۴.۴ – یکنوایی</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <h2 class="cond-title">یکنوایی (Monotonicity)</h2>
+
+        <div class="side-compare">
+            <div class="compare-col">
+                <h3 style="color:var(--c-green);">شرط برقرار است</h3>
+                <div class="card-header"><span>قبل</span><span class="badge condorcet">برنده: A</span></div>
+                <div class="graph-wrap"><canvas id="holdBefore" width="400" height="400"></canvas></div>
+                <div class="graph-legend" id="holdBeforeL"></div>
+                <div id="holdBeforeBars"></div>
+                <div class="card-header" style="margin-top:10px;"><span>بعد — A بالاتر رفته</span><span class="badge condorcet">برنده: A</span></div>
+                <div class="graph-wrap"><canvas id="holdAfter" width="400" height="400"></canvas></div>
+                <div class="graph-legend" id="holdAfterL"></div>
+                <div id="holdAfterBars"></div>
+            </div>
+            <div class="compare-col">
+                <h3 style="color:var(--c-rose);">شرط نقض می‌شود</h3>
+                <div class="card-header"><span>قبل</span><span class="badge condorcet">جایگاه بهتر: A برنده</span></div>
+                <div class="graph-wrap"><canvas id="failBefore" width="400" height="400"></canvas></div>
+                <div class="graph-legend" id="failBeforeL"></div>
+                <div class="result-box win">برنده: A</div>
+                <div class="card-header" style="margin-top:10px;"><span>بعد — وضعیت A بهتر شده</span><span class="badge cycle">جایگاه بدتر</span></div>
+                <div class="graph-wrap"><canvas id="failAfter" width="400" height="400"></canvas></div>
+                <div class="graph-legend" id="failAfterL"></div>
+                <div class="result-box loss">برنده: C — با وجود بهتر شدن A</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+            <div class="card-header"><span>آرا</span></div>
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadHold" type="button">نمونه برقرار</button>
+                <button class="outline" id="loadFailB" type="button">نمونه نقض — قبل</button>
+                <button class="outline" id="loadFailA" type="button">نمونه نقض — بعد</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                </div>
+                <div>
+                    <div id="liveOut"></div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="420" height="420"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script>
+        const M = Mentor;
+        const FIVE = ['A','B','C','D','E'];
+        const holdBefore = M.expandGroups([
+            { n: 6, rank: 'A>B>C>D>E' },
+            { n: 4, rank: 'B>A>C>D>E' },
+            { n: 3, rank: 'C>B>A>D>E' },
+            { n: 2, rank: 'D>E>B>C>A' },
+            { n: 2, rank: 'E>D>C>B>A' }
+        ]);
+        const holdAfter = M.expandGroups([
+            { n: 8, rank: 'A>B>C>D>E' },
+            { n: 2, rank: 'B>A>C>D>E' },
+            { n: 3, rank: 'C>B>A>D>E' },
+            { n: 2, rank: 'D>E>B>C>A' },
+            { n: 2, rank: 'E>D>C>B>A' }
+        ]);
+        const failBefore = M.expandGroups([
+            { n: 6, rank: 'A>B>C>D>E' },
+            { n: 6, rank: 'B>C>A>D>E' },
+            { n: 5, rank: 'C>A>B>D>E' },
+            { n: 2, rank: 'D>E>A>B>C' },
+            { n: 2, rank: 'E>D>A>B>C' }
+        ]);
+        const failAfter = M.expandGroups([
+            { n: 8, rank: 'A>B>C>D>E' },
+            { n: 4, rank: 'B>C>A>D>E' },
+            { n: 5, rank: 'C>A>B>D>E' },
+            { n: 2, rank: 'D>E>A>B>C' },
+            { n: 2, rank: 'E>D>A>B>C' }
+        ]);
+
+        function paint(id, legendId, barsId, voters, winner, method) {
+            const counts = M.buildCounts(voters, FIVE);
+            M.drawGraph(document.getElementById(id), counts, { candidates: FIVE, highlightWinner: winner });
+            document.getElementById(legendId).innerHTML = M.legendHtml(counts, { candidates: FIVE });
+            if (barsId) {
+                const scores = method === 'pl'
+                    ? M.plurality(voters, FIVE).counts
+                    : M.borda(voters, FIVE).scores;
+                M.renderScoreBars(document.getElementById(barsId), scores, FIVE);
+            }
+        }
+        paint('holdBefore', 'holdBeforeL', 'holdBeforeBars', holdBefore, 'A', 'pl');
+        paint('holdAfter', 'holdAfterL', 'holdAfterBars', holdAfter, 'A', 'pl');
+        paint('failBefore', 'failBeforeL', null, failBefore, 'A');
+        paint('failAfter', 'failAfterL', null, failAfter, 'C');
+
+        const lab = M.createLab({
+            candidates: FIVE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const pl = M.plurality(lab.state.voters, cands);
+                const el = document.getElementById('liveOut');
+                if (!lab.state.voters.length) { el.innerHTML = ''; return; }
+                el.innerHTML = `<div class="result-box info">برنده رأیِ اول در این آرا: ${pl.winner || '—'}</div>`;
+                M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: pl.winner });
+            }
+        });
+        document.getElementById('loadHold').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(holdBefore, true); });
+        document.getElementById('loadFailB').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(failBefore, true); });
+        document.getElementById('loadFailA').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(failAfter, true); });
+        lab.setVoters(failBefore, true);
+    </script>
+</body>
+</html>

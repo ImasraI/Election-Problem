@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۶.۳ – بوردا</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <h2 class="cond-title">روش بوردا</h2>
+        <div id="chart"></div>
+        <div class="card">
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">مثال نمونه</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                </div>
+                <div>
+                    <div id="bars"></div>
+                    <div id="out"></div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="460" height="460"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script>
+        const M = Mentor;
+        const FIVE = ['A','B','C','D','E'];
+        const EXAMPLE = M.expandGroups([
+            { n: 3, rank: 'A>B>C>D>E' },
+            { n: 3, rank: 'B>C>D>E>A' },
+            { n: 2, rank: 'C>B>A>D>E' },
+            { n: 1, rank: 'D>E>B>C>A' },
+            { n: 1, rank: 'E>D>B>C>A' }
+        ]);
+        M.renderCriteriaChart(document.getElementById('chart'), {
+            AAW: true, CWC: false, UNAN: true, MONO: true, IIA: false
+        }, {
+            title: 'نمودار ازپیش‌آماده‌شده',
+            examples: [
+                { rule: 'CWC', title: 'امتیاز رتبه با پیروزی دونفره یکی نیست', ballots: ['چند گروه A را اول می‌گذارند', 'بقیه B را در رتبه‌های بالا پخش می‌کنند'], result: 'بوردا ممکن است B را برنده کند در حالی که C همه را دونفره می‌برد.', why: 'جمع امتیاز، معیار کندورسه را تضمین نمی‌کند.' },
+                { rule: 'IIA', title: 'جابه‌جایی C امتیاز A و B را عوض می‌کند', ballots: ['A در برابر B در همه برگه‌ها ثابت است', 'رتبه C عوض می‌شود'], result: 'برنده از A به B می‌چرخد.', why: 'امتیازها به تعداد و جای نامزد سوم وابسته‌اند.' }
+            ]
+        });
+        const lab = M.createLab({
+            candidates: FIVE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const br = M.borda(lab.state.voters, cands);
+                const cw = counts ? M.hasCondorcet(counts, cands) : null;
+                if (br.scores) M.renderScoreBars(document.getElementById('bars'), br.scores, cands);
+                M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: br.winner });
+                const el = document.getElementById('out');
+                if (!lab.state.voters.length) { el.innerHTML = ''; return; }
+                el.innerHTML = `<div class="result-box win">برنده بوردا: ${br.winner}</div>` +
+                    (cw && cw !== br.winner ? `<div class="result-box loss">برنده کندورسه ${cw} بود.</div>` : '');
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(EXAMPLE, true); });
+        lab.setVoters(EXAMPLE, true);
+    </script>
+</body>
+</html>
