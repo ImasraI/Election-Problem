@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>رأی‌گیری</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <h2>رأی‌گیری</h2>
+        <div class="card">
+            <p class="text-muted">سه نامزد A، B و C را به ترتیب ترجیح خود بچینید. تا وقتی ادمین نتیجه را نشان ندهد می‌توانید رأی را عوض کنید.</p>
+            <div id="rankBox" style="margin-top:12px;"></div>
+            <div class="row" style="margin-top:12px;">
+                <button class="primary" id="submitBtn" type="button">ثبت رأی</button>
+                <button class="success hidden" id="presentBtn" type="button">Present / نمایش نتایج</button>
+            </div>
+            <div id="status" class="text-muted" style="margin-top:10px;"></div>
+        </div>
+        <div class="card hidden" id="resultsCard">
+            <div class="card-header"><span>نتیجه رأی‌گیری کلاس</span><span class="badge" id="voteCount">۰ رأی</span></div>
+            <div id="scoreBars"></div>
+            <div class="results-grid">
+                <div>
+                    <canvas id="voteGraph" width="520" height="420"></canvas>
+                    <div class="legend" id="voteLegend"></div>
+                </div>
+                <div id="tally"></div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const widget = new M.RankingWidget('rankBox', { candidates: ['A', 'B', 'C'] });
+        const statusEl = document.getElementById('status');
+        const submitBtn = document.getElementById('submitBtn');
+        const presentBtn = document.getElementById('presentBtn');
+        const resultsCard = document.getElementById('resultsCard');
+        let me = null;
+        let revealed = false;
+        let appliedMine = false;
+
+        function applyVote(vote) {
+            if (!vote || !vote.rank) return;
+            widget.setOrder(M.parseRanking(vote.rank));
+        }
+
+        function showResults(votes) {
+            resultsCard.classList.remove('hidden');
+            document.getElementById('voteCount').textContent = (votes || []).length + ' رأی';
+            const ranks = (votes || []).map(v => v.rank);
+            const cands = ['A', 'B', 'C'];
+            const plur = M.plurality(ranks, cands);
+            M.renderScoreBars(document.getElementById('scoreBars'), plur.counts, cands);
+            const counts = ranks.length ? M.buildCounts(ranks, cands) : null;
+            M.drawGraph(document.getElementById('voteGraph'), counts, {
+                candidates: cands,
+                highlightWinner: plur.winner
+            });
+            document.getElementById('voteLegend').innerHTML = M.legendHtml(counts, { candidates: cands });
+            const borda = M.borda(ranks, cands);
+            document.getElementById('tally').innerHTML = `
+                <p>برنده اکثریت نسبی: <strong>${plur.winner || '—'}</strong></p>
+                <p>برنده بوردا: <strong>${borda.winner || '—'}</strong></p>
+                <p>برنده کندورسه: <strong>${counts ? (M.hasCondorcet(counts, cands) || 'ندارد') : '—'}</strong></p>
+                <div class="voter-list" style="margin-top:12px;">
+                    ${(votes || []).map(v => `<div class="voter-item"><span class="rank">${M.escapeHtml(v.name)} · ${M.escapeHtml(v.team)} — ${M.formatRank(v.rank)}</span></div>`).join('') || '<div class="empty-state">رأیی نیست.</div>'}
+                </div>`;
+        }
+
+        submitBtn.addEventListener('click', async () => {
+            submitBtn.disabled = true;
+            try {
+                await Workshop.request('POST', '/api/vote', { rank: widget.getString() });
+                statusEl.textContent = 'رأی شما ثبت شد.';
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            }
+            submitBtn.disabled = revealed;
+        });
+
+        presentBtn.addEventListener('click', async () => {
+            presentBtn.disabled = true;
+            try {
+                const data = await Workshop.request('POST', '/api/vote/present', {});
+                revealed = true;
+                submitBtn.disabled = true;
+                showResults(data.votes || []);
+                statusEl.textContent = 'نتیجه برای همه نمایش داده شد.';
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+                presentBtn.disabled = false;
+            }
+        });
+
+        Workshop.startPolling((data, changed) => {
+            me = data.me;
+            if (!changed) return;
+            presentBtn.classList.toggle('hidden', !(me && me.role === 'admin'));
+            if (data.my_vote && !appliedMine) {
+                applyVote(data.my_vote);
+                appliedMine = true;
+            }
+            revealed = !!data.vote_revealed;
+            if (revealed) {
+                submitBtn.disabled = true;
+                showResults(data.votes || []);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -658,6 +658,7 @@
     </div>
 
     <script src="shared.js"></script>
+    <script src="workshop.js"></script>
     <script>
         const N = 9;
         const PIVOT_ID = 5; // identity of the pivotal voter (was: fixed column index 4)
@@ -673,8 +674,8 @@
 
         // Each voter now carries its own identity (id) alongside its ranking, so
         // that when two voters are swapped, the id (and thus its "V#" label and
-        // pivot marking) travels with the ranking instead of staying pinned to
-        // the column position. This lets the pivotal voter end up in any column.
+        // pivot marking) travels with the ranking instead of staying pinned to the
+        // column position. This lets the pivotal voter end up in any column.
         const initial = rawInitial.map(profile => profile.map((rank, vi) => ({ id: vi + 1, rank: [...rank] })));
 
         let profiles = structuredClone(initial);
@@ -682,6 +683,16 @@
         let dragged = null;
         const prevResultKey = {};
         let interactionsBound = false;
+        let canEdit = false;
+        let pushTimer = null;
+
+        function pushArrows() {
+            if (!canEdit) return;
+            clearTimeout(pushTimer);
+            pushTimer = setTimeout(() => {
+                Workshop.request('POST', '/api/arrows', { profiles }).catch(() => {});
+            }, 250);
+        }
 
         function flipTo(el, oldRect) {
             if (!el || !oldRect) return;
@@ -710,7 +721,7 @@
         }
 
         function itemHTML(x, key, draggable) {
-            const drag = draggable === false ? 'false' : 'true';
+            const drag = (draggable === false || !canEdit) ? 'false' : 'true';
             return `<div class="item ${x}" draggable="${drag}" data-candidate="${x}" data-key="${key}">${x}</div>`;
         }
 
@@ -793,7 +804,7 @@
                     <div class="voter ${pi === 2 && voter.id === PIVOT_ID ? 'pivot-q' : ''}"
                          data-profile="${pi}"
                          data-voter="${vi}">
-                        <div class="voter-head" draggable="true">
+                        <div class="voter-head" draggable="${canEdit ? 'true' : 'false'}">
                             <span class="voter-num">V${voter.id}</span>
                         </div>
                         <div class="tier-list">${tierHTML(voter.rank, `v-${pi}-${voter.id}`)}</div>
@@ -808,7 +819,7 @@
                         <h2>${names[pi]}</h2>
                     </div>
 
-                    <div class="controls" style="margin-bottom:10px">
+                    <div class="controls" style="margin-bottom:10px${canEdit ? '' : ';display:none'}">
                         <button class="primary" data-btop="${pi}">↑ انتقال همهٔ B به بالا</button>
                         <button class="success" data-bbottom="${pi}">↓ انتقال همهٔ B به پایین</button>
                     </div>
@@ -863,6 +874,10 @@
             const root = document.getElementById('profiles');
 
             root.addEventListener('dragstart', e => {
+                if (!canEdit) {
+                    e.preventDefault();
+                    return;
+                }
                 const item = e.target.closest('.item');
                 if (item) {
                     if (item.closest('.result-voter')) {
@@ -938,6 +953,7 @@
                     arr.splice(b, 0, dragged.dataset.candidate);
                     reorderWithFlip(list, arr);
                     syncResult(pi);
+                    pushArrows();
                     return;
                 }
                 if (dragged && dragged.type === 'voter') {
@@ -950,14 +966,15 @@
                     if (pi !== dragged.profile || from === to) return;
                     [profiles[pi][from], profiles[pi][to]] = [profiles[pi][to], profiles[pi][from]];
                     swapVoterNodes(pi, from, to);
+                    pushArrows();
                 }
             });
 
             root.addEventListener('click', e => {
                 const top = e.target.closest('[data-btop]');
                 const bot = e.target.closest('[data-bbottom]');
-                if (top) moveBRow(+top.dataset.btop, 'top');
-                if (bot) moveBRow(+bot.dataset.bbottom, 'bottom');
+            if (top) { moveBRow(+top.dataset.btop, 'top'); pushArrows(); }
+            if (bot) { moveBRow(+bot.dataset.bbottom, 'bottom'); pushArrows(); }
             });
         }
 
@@ -974,12 +991,26 @@
         }
 
         document.getElementById('reset').onclick = () => {
+            if (!canEdit) return;
             profiles = structuredClone(initial);
             renderProfiles();
+            pushArrows();
         };
 
         bindInteractions();
         renderProfiles();
+        Workshop.startPolling((data) => {
+            const admin = data.me && data.me.role === 'admin';
+            if (admin !== canEdit) {
+                canEdit = admin;
+                document.getElementById('reset').style.display = canEdit ? '' : 'none';
+                renderProfiles();
+            }
+            if (!canEdit && data.arrows && JSON.stringify(data.arrows) !== JSON.stringify(profiles)) {
+                profiles = data.arrows;
+                renderProfiles();
+            }
+        });
     </script>
 </body>
 

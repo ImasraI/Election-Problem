@@ -3,7 +3,7 @@
   "functions": {
     "app.py": {
       "maxDuration": 60,
-      "excludeFiles": "{public/**,*.html,*.css,*.js,*.bat,*.md}"
+      "excludeFiles": "{public/**,data/**,*.html,*.css,*.js,*.bat,*.md}"
     }
   }
 }

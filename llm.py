@@ -1,15 +1,14 @@
-import json
 import os
 import sys
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
+import uvicorn
+
+from app import app
 from llm_core import (
     MODEL_NAME,
     evaluate_criteria,
     generate_examples,
     get_api_key,
-    normalize_criteria,
     save_env_key,
     _clean_env_value,
     _is_real_key,
@@ -17,8 +16,6 @@ from llm_core import (
 
 HOST = "0.0.0.0"
 PORT = 8765
-ROOT = Path(__file__).resolve().parent
-STATIC = ROOT / "public"
 
 
 def prompt_for_api_key() -> str:
@@ -46,93 +43,17 @@ def require_api_key() -> str:
         return key
 
 
-class AppHandler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(STATIC), **kwargs)
-
-    def log_message(self, fmt, *args):
-        sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
-
-    def _cors(self):
-        origin = self.headers.get("Origin") or "*"
-        self.send_header("Access-Control-Allow-Origin", origin if origin != "null" else "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Vary", "Origin")
-
-    def end_headers(self):
-        self._cors()
-        super().end_headers()
-
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Private-Network", "true")
-        self.end_headers()
-
-    def do_GET(self):
-        path = self.path.split("?", 1)[0].rstrip("/")
-        if path == "/api/health":
-            self._json(200, {"ok": True, "model": MODEL_NAME})
-            return
-        super().do_GET()
-
-    def _json(self, code, payload):
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def do_POST(self):
-        path = self.path.split("?", 1)[0].rstrip("/")
-        length = int(self.headers.get("Content-Length") or 0)
-        try:
-            body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
-        except json.JSONDecodeError:
-            self._json(400, {"error": "Body must be JSON."})
-            return
-        prompt = str(body.get("prompt") or "").strip()
-        if path == "/api/evaluate":
-            if not prompt:
-                self._json(400, {"error": "prompt is required."})
-                return
-            try:
-                criteria = evaluate_criteria(prompt)
-                self._json(200, {"criteria": criteria, "prompt": prompt})
-            except Exception as exc:
-                self._json(502, {"error": str(exc)})
-            return
-        if path == "/api/examples":
-            if not prompt:
-                self._json(400, {"error": "prompt is required."})
-                return
-            try:
-                criteria = normalize_criteria(body.get("criteria"))
-                examples = generate_examples(prompt, criteria)
-                self._json(200, {"examples": examples, "prompt": prompt})
-            except Exception as exc:
-                self._json(502, {"error": str(exc)})
-            return
-        self._json(404, {"error": "Unknown endpoint."})
-
-
 def serve(host=HOST, port=PORT):
     require_api_key()
-    ThreadingHTTPServer.allow_reuse_address = True
-    server = ThreadingHTTPServer((host, port), AppHandler)
     print(f"Open http://127.0.0.1:{port}/index.html", flush=True)
+    print("Admin login: username admin  (password from ADMIN_PASSWORD, default admin)", flush=True)
     print("Using DeepSeek model via OrcaRouter:", MODEL_NAME, flush=True)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopped.")
+    uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 def main():
     require_api_key()
+    import json
     prompt = input("Enter your prompt: ")
     criteria = evaluate_criteria(prompt)
     print("\n--- Criteria ---\n")

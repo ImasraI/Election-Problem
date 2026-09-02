@@ -523,3 +523,48 @@ ul.plain li { margin-bottom: 4px; }
 }
 .edit-btn { padding: 4px 10px; font-size: 12px; }
 .method-hero p { font-size: 15px; line-height: 1.9; }
+.hidden { display: none !important; }
+button:disabled, .tab-btn.locked, .sub-tab-btn.locked {
+    opacity: .42;
+    cursor: not-allowed;
+    transform: none;
+}
+.tab-btn.locked, .sub-tab-btn.locked {
+    min-width: 76px;
+    color: transparent !important;
+    pointer-events: none;
+}
+.tab-btn.locked.admin-unlock, .sub-tab-btn.locked.admin-unlock {
+    pointer-events: auto;
+    cursor: pointer;
+    color: transparent !important;
+}
+.user-chip {
+    margin-right: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--c-muted);
+}
+.admin-panel {
+    margin: 0 0 14px;
+    padding: 14px 16px;
+}
+.admin-panel form, .admin-create {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.admin-create input { min-width: 140px; }
+.user-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+.user-table th, .user-table td { text-align: right; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+}
+@media (max-width: 800px) { .results-grid { grid-template-columns: 1fr; } }

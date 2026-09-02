@@ -26,12 +26,6 @@
             font-size: 26px; font-weight: 800; color: var(--c-text);
             display: flex; align-items: center; gap: 10px;
         }
-        .header h1 small {
-            font-size: 14px; font-weight: 500; color: var(--c-muted);
-            margin-right: 4px; background: rgba(165, 243, 252, .1);
-            border: 1px solid rgba(165, 243, 252, .22);
-            padding: 3px 12px; border-radius: 999px;
-        }
         .tab-bar, .sub-tab-bar {
             display: flex; flex-wrap: wrap; gap: 6px;
             margin-bottom: 12px; align-items: center;
@@ -81,21 +75,34 @@
 <body>
     <div class="app">
         <div class="header">
-            <h1>
-                کارگاه انتخاب اجتماعی
-            </h1>
+            <h1>کارگاه انتخاب اجتماعی</h1>
+            <div class="user-chip" id="userChip"></div>
+        </div>
+
+        <div class="card admin-panel hidden" id="adminPanel">
+            <div class="card-header"><span>حساب‌های دانش‌آموز (فقط ادمین)</span></div>
+            <div class="admin-create">
+                <input id="newUser" placeholder="نام کاربری">
+                <input id="newPass" placeholder="رمز عبور" type="password">
+                <button class="primary" id="createUserBtn" type="button">ساخت حساب</button>
+                <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی کارگاه</button>
+            </div>
+            <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
+            <table class="user-table" id="userTable"></table>
         </div>
 
         <div class="tab-bar" id="tabBar"></div>
         <div class="sub-tab-bar hidden" id="subTabBar"></div>
 
         <div class="iframe-container">
-            <iframe id="stateFrame" src="state1.html" title="استیت جاری"></iframe>
+            <iframe id="stateFrame" src="vote.html" title="استیت جاری"></iframe>
         </div>
     </div>
 
+    <script src="workshop.js"></script>
     <script>
         const GROUPS = [
+            { id: 'vote', label: 'رأی‌گیری', file: 'vote.html' },
             { id: 's1', label: 'استیت ۱', file: 'state1.html' },
             { id: 's2', label: 'استیت ۲', file: 'state2.html' },
             { id: 's3', label: 'استیت ۳', file: 'state3.html' },
@@ -123,6 +130,7 @@
             { id: 's7', label: 'اثبات ارو', file: 'Arrows_therom.html' }
         ];
 
+        const NAMED_WHEN_LOCKED = new Set(['vote']);
         const leaves = [];
         GROUPS.forEach(g => {
             if (g.children) g.children.forEach(c => leaves.push({ ...c, group: g.id }));
@@ -133,12 +141,82 @@
         const subTabBar = document.getElementById('subTabBar');
         const iframe = document.getElementById('stateFrame');
         let current = 0;
+        let me = null;
+        let unlocked = ['vote'];
+
+        function isAdmin() { return me && me.role === 'admin'; }
+        function isUnlocked(id) { return unlocked.indexOf(id) >= 0; }
+        function groupUnlocked(g) {
+            if (g.children) return g.children.some(c => isUnlocked(c.id)) || isUnlocked(g.id);
+            return isUnlocked(g.id);
+        }
+        function firstOpenLeaf(g) {
+            if (!g.children) return g.id;
+            const open = g.children.find(c => isUnlocked(c.id));
+            return open ? open.id : g.children[0].id;
+        }
+        function studentLabel(item, parentLocked) {
+            if (isAdmin()) return item.label;
+            if (item.children) return groupUnlocked(item) ? item.label : '';
+            if (NAMED_WHEN_LOCKED.has(item.id) || isUnlocked(item.id)) return item.label;
+            if (parentLocked) return '';
+            return '';
+        }
+
+        function renderUser() {
+            const chip = document.getElementById('userChip');
+            if (!me) { chip.innerHTML = ''; return; }
+            chip.innerHTML = `
+                <span>${me.name || me.username}${me.team ? ' · ' + me.team : ''}</span>
+                <span class="badge">${me.points || 0} امتیاز</span>
+                <button class="outline" id="logoutBtn" type="button">خروج</button>
+            `;
+            document.getElementById('logoutBtn').addEventListener('click', () => Workshop.logout());
+            document.getElementById('adminPanel').classList.toggle('hidden', !isAdmin());
+        }
+
+        async function refreshUsers() {
+            if (!isAdmin()) return;
+            try {
+                const data = await Workshop.request('GET', '/api/admin/users');
+                const rows = (data.users || []).map(u => `
+                    <tr>
+                        <td>${u.username}</td>
+                        <td>${u.name || '—'}</td>
+                        <td>${u.team || '—'}</td>
+                        <td>${u.role === 'admin' ? 'ادمین' : 'دانش‌آموز'}</td>
+                        <td>${u.points}</td>
+                        <td>${u.used_state5 ? 'ارسال شده' : '—'}</td>
+                        <td>${u.role === 'admin' ? '' : `<button class="remove-btn" data-del="${u.username}" type="button">حذف</button>`}</td>
+                    </tr>`).join('');
+                document.getElementById('userTable').innerHTML = `
+                    <thead><tr><th>کاربری</th><th>نام</th><th>تیم</th><th>نقش</th><th>امتیاز</th><th>استیت ۵</th><th></th></tr></thead>
+                    <tbody>${rows}</tbody>`;
+                document.querySelectorAll('[data-del]').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        await Workshop.request('POST', '/api/admin/users/delete', { username: btn.dataset.del });
+                        refreshUsers();
+                    });
+                });
+            } catch (err) {
+                document.getElementById('adminStatus').textContent = err.message || String(err);
+            }
+        }
 
         function renderChrome() {
             const leaf = leaves[current];
-            tabBar.innerHTML = GROUPS.map(g =>
-                `<button class="tab-btn ${g.id === leaf.group ? 'active' : ''}" data-group="${g.id}">${g.label}</button>`
-            ).join('') + `
+            tabBar.innerHTML = GROUPS.map(g => {
+                const open = groupUnlocked(g);
+                const locked = !isAdmin() && !open;
+                const label = studentLabel(g);
+                const cls = [
+                    'tab-btn',
+                    g.id === leaf.group ? 'active' : '',
+                    locked ? 'locked' : '',
+                    isAdmin() && !open ? 'admin-unlock' : ''
+                ].join(' ');
+                return `<button class="${cls}" data-group="${g.id}">${label || '&nbsp;'}</button>`;
+            }).join('') + `
                 <div class="tab-nav">
                     <button id="prevTab" type="button">◀</button>
                     <span class="tab-indicator">${current + 1} / ${leaves.length}</span>
@@ -147,25 +225,60 @@
             const group = GROUPS.find(g => g.id === leaf.group);
             if (group.children) {
                 subTabBar.classList.remove('hidden');
-                subTabBar.innerHTML = group.children.map(c =>
-                    `<button class="sub-tab-btn ${c.id === leaf.id ? 'active' : ''}" data-id="${c.id}">${c.label}</button>`
-                ).join('');
+                subTabBar.innerHTML = group.children.map(c => {
+                    const open = isUnlocked(c.id);
+                    const locked = !isAdmin() && !open;
+                    const label = isAdmin() || open ? c.label : '';
+                    const cls = [
+                        'sub-tab-btn',
+                        c.id === leaf.id ? 'active' : '',
+                        locked ? 'locked' : '',
+                        isAdmin() && !open ? 'admin-unlock' : ''
+                    ].join(' ');
+                    return `<button class="${cls}" data-id="${c.id}">${label || '&nbsp;'}</button>`;
+                }).join('');
             } else {
                 subTabBar.classList.add('hidden');
                 subTabBar.innerHTML = '';
             }
             tabBar.querySelectorAll('[data-group]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const g = GROUPS.find(x => x.id === btn.dataset.group);
-                    const first = g.children ? g.children[0].id : g.id;
-                    switchTo(leaves.findIndex(l => l.id === first));
-                });
+                btn.addEventListener('click', () => onGroupClick(btn.dataset.group));
             });
             subTabBar.querySelectorAll('[data-id]').forEach(btn => {
-                btn.addEventListener('click', () => switchTo(leaves.findIndex(l => l.id === btn.dataset.id)));
+                btn.addEventListener('click', () => onLeafClick(btn.dataset.id));
             });
-            document.getElementById('prevTab').addEventListener('click', () => switchTo(current - 1));
-            document.getElementById('nextTab').addEventListener('click', () => switchTo(current + 1));
+            document.getElementById('prevTab').addEventListener('click', () => step(-1));
+            document.getElementById('nextTab').addEventListener('click', () => step(1));
+        }
+
+        async function onGroupClick(id) {
+            const g = GROUPS.find(x => x.id === id);
+            const target = firstOpenLeaf(g);
+            await onLeafClick(target);
+        }
+
+        async function onLeafClick(id) {
+            const idx = leaves.findIndex(l => l.id === id);
+            if (idx < 0) return;
+            if (!isAdmin() && !isUnlocked(id)) return;
+            if (isAdmin() && !isUnlocked(id)) {
+                try {
+                    const data = await Workshop.unlock(id);
+                    unlocked = data.unlocked || unlocked.concat([id]);
+                } catch (e) { return; }
+            }
+            switchTo(idx);
+        }
+
+        function step(dir) {
+            let idx = current + dir;
+            while (idx >= 0 && idx < leaves.length) {
+                if (isAdmin() || isUnlocked(leaves[idx].id)) {
+                    onLeafClick(leaves[idx].id);
+                    return;
+                }
+                idx += dir;
+            }
         }
 
         function switchTo(index) {
@@ -182,8 +295,43 @@
             } catch (e) { /* ignore */ }
         });
 
-        renderChrome();
-        switchTo(0);
+        document.getElementById('createUserBtn').addEventListener('click', async () => {
+            const status = document.getElementById('adminStatus');
+            status.textContent = '';
+            try {
+                await Workshop.request('POST', '/api/admin/users', {
+                    username: document.getElementById('newUser').value,
+                    password: document.getElementById('newPass').value
+                });
+                document.getElementById('newUser').value = '';
+                document.getElementById('newPass').value = '';
+                status.textContent = 'حساب ساخته شد.';
+                refreshUsers();
+            } catch (err) {
+                status.textContent = err.message || String(err);
+            }
+        });
+        document.getElementById('resetWorkshopBtn').addEventListener('click', async () => {
+            if (!confirm('رأی‌ها، امتیازها و پنل‌های بازشده پاک شوند؟')) return;
+            await Workshop.request('POST', '/api/admin/reset', {});
+            unlocked = ['vote'];
+            switchTo(0);
+            refreshUsers();
+        });
+
+        Workshop.startPolling((data, changed) => {
+            me = data.me;
+            unlocked = data.unlocked || ['vote'];
+            if (!changed) return;
+            renderUser();
+            if (isAdmin()) refreshUsers();
+            if (!isAdmin() && leaves[current] && !isUnlocked(leaves[current].id)) {
+                const fallback = leaves.findIndex(l => isUnlocked(l.id));
+                switchTo(fallback < 0 ? 0 : fallback);
+            } else {
+                renderChrome();
+            }
+        });
     </script>
 </body>
 </html>

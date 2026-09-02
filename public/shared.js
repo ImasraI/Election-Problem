@@ -857,7 +857,12 @@
             try {
                 const res = await fetch(base + path, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(localStorage.getItem('workshop-token')
+                            ? { Authorization: 'Bearer ' + localStorage.getItem('workshop-token') }
+                            : {})
+                    },
                     body: JSON.stringify(payload)
                 });
                 let data = {};

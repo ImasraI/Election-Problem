@@ -12,25 +12,25 @@
 
         <div class="card">
             <div class="card-header">
-                <span>افزودن یا ارزیابی ایده</span>
+                <span>ارسال روش (هر نفر یک بار)</span>
                 <span class="badge" id="ideaCount">۰ ایده</span>
             </div>
-            <textarea id="ideaInput" placeholder="روش تازه‌ای بنویسید یا یکی از فهرست را انتخاب کنید"></textarea>
+            <textarea id="ideaInput" placeholder="روش رأی‌گیری خود را بنویسید"></textarea>
             <div class="row" style="margin-top:10px;">
                 <button class="primary" id="addIdeaBtn" type="button">ثبت و ارزیابی</button>
                 <button class="outline" id="examplesBtn" type="button">مثال‌های نقض</button>
-                <button class="outline" id="clearIdeasBtn" type="button">حذف همه</button>
             </div>
             <div id="evalStatus" class="text-muted" style="margin-top:10px;"></div>
             <div id="criteriaChart"></div>
         </div>
 
         <div class="card">
-            <div class="card-header"><span>فهرست روش‌ها (از استیت ۱ و همین‌جا)</span></div>
+            <div class="card-header"><span>روش‌های کلاس</span></div>
             <div id="ideaList"></div>
         </div>
     </div>
     <script src="shared.js"></script>
+    <script src="workshop.js"></script>
     <script>
         const M = Mentor;
         const input = document.getElementById('ideaInput');
@@ -40,21 +40,24 @@
         const chartEl = document.getElementById('criteriaChart');
         const addBtn = document.getElementById('addIdeaBtn');
         const examplesBtn = document.getElementById('examplesBtn');
-        let ideas = M.loadIdeas().map(item => typeof item === 'string' ? { text: item, criteria: null } : item);
+        let ideas = [];
         let selected = -1;
+        let me = null;
 
         function hasFailed(idea) {
             return !!(idea && idea.criteria && Object.values(idea.criteria).some(v => !v));
         }
-        function save() { M.saveIdeas(ideas); render(); }
+        function who(idea) {
+            return `${idea.name || idea.username || ''} · ${idea.team || 'بدون تیم'} · ${idea.points || 0} امتیاز`;
+        }
 
         function showChart(idea) {
             if (!idea || !idea.criteria) {
-                M.renderCriteriaChart(chartEl, null, { empty: 'یک ایده را ارزیابی کنید تا نمودار پنج شرط دیده شود.' });
+                M.renderCriteriaChart(chartEl, null, { empty: 'یک روش را ارزیابی کنید تا نمودار پنج شرط دیده شود.' });
                 return;
             }
             M.renderCriteriaChart(chartEl, idea.criteria, {
-                title: 'ارزیابی: «' + idea.text.slice(0, 48) + (idea.text.length > 48 ? '…' : '') + '»',
+                title: who(idea) + ' — «' + String(idea.text || '').slice(0, 48) + (String(idea.text || '').length > 48 ? '…' : '') + '»',
                 examples: idea.examples || [],
                 examplesFailed: !!(idea.examplesLoaded && !(idea.examples || []).length)
             });
@@ -64,8 +67,12 @@
             count.textContent = ideas.length + ' ایده';
             if (selected >= ideas.length) selected = ideas.length - 1;
             if (selected < 0 && ideas.length) selected = ideas.length - 1;
+            const used = !!(me && me.role !== 'admin' && me.used_state5);
+            addBtn.disabled = used;
+            input.disabled = used;
+            if (used) statusEl.textContent = statusEl.textContent || 'سهمیه ارسال شما استفاده شده است.';
             if (!ideas.length) {
-                list.innerHTML = '<div class="empty-state">در استیت ۱ یا اینجا ایده‌ای ثبت کنید.</div>';
+                list.innerHTML = '<div class="empty-state">هنوز کسی روشی نفرستاده است.</div>';
                 M.renderCriteriaChart(chartEl, null, { empty: 'هنوز ایده‌ای نیست.' });
                 examplesBtn.disabled = true;
                 return;
@@ -73,94 +80,51 @@
             list.innerHTML = ideas.map((item, i) => `
                 <div class="idea-item ${i === selected ? 'active' : ''}" data-select="${i}">
                     <span class="badge">${i + 1}</span>
-                    <input data-idx="${i}" value="${String(item.text || '').replace(/"/g, '&quot;')}">
+                    <div class="idea-text">
+                        <strong>${M.escapeHtml(item.name || item.username)}</strong>
+                        <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
+                        <div>${M.escapeHtml(item.text || '')}</div>
+                    </div>
                     <span class="badge ${item.criteria ? (Object.values(item.criteria).every(Boolean) ? 'condorcet' : 'cycle') : ''}">
-                        ${item.criteria ? (Object.values(item.criteria).filter(v => !v).length + ' نقض') : 'بدون ارزیابی'}
+                        ${item.points || 0} امتیاز
                     </span>
-                    <button class="remove-btn" data-idx="${i}" type="button">✕</button>
                 </div>`).join('');
-            list.querySelectorAll('input').forEach(inp => {
-                inp.addEventListener('click', e => e.stopPropagation());
-                inp.addEventListener('change', () => {
-                    const idx = parseInt(inp.dataset.idx, 10);
-                    ideas[idx].text = inp.value.trim();
-                    ideas[idx].criteria = null;
-                    ideas[idx].examples = [];
-                    ideas[idx].examplesLoaded = false;
-                    save();
-                });
-            });
-            list.querySelectorAll('.remove-btn').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    ideas.splice(parseInt(btn.dataset.idx, 10), 1);
-                    save();
-                });
-            });
             list.querySelectorAll('[data-select]').forEach(row => {
                 row.addEventListener('click', () => {
                     selected = parseInt(row.dataset.select, 10);
                     showChart(ideas[selected]);
-                    if (ideas[selected] && !ideas[selected].criteria) {
-                        statusEl.textContent = 'این ایده هنوز ارزیابی نشده. «ثبت و ارزیابی» را بزنید (کادر بالا می‌تواند خالی باشد).';
-                    }
                     render();
                 });
             });
-            if (selected >= 0) showChart(ideas[selected]);
-            else M.renderCriteriaChart(chartEl, null);
-            examplesBtn.disabled = !hasFailed(selected >= 0 ? ideas[selected] : null);
+            const idea = selected >= 0 ? ideas[selected] : null;
+            const canEx = hasFailed(idea) && me && (me.role === 'admin' || idea.username === me.username);
+            examplesBtn.disabled = !canEx;
         }
 
         async function addAndEvaluate() {
             const t = input.value.trim();
             if (!t) {
-                if (selected >= 0 && ideas[selected] && !ideas[selected].criteria) {
-                    await evaluateAt(selected);
-                }
+                statusEl.textContent = 'روش را بنویسید.';
                 return;
             }
             addBtn.disabled = true;
             examplesBtn.disabled = true;
             statusEl.textContent = 'در حال ارزیابی پنج معیار…';
-            const idea = { text: t, criteria: null, examples: [], examplesLoaded: false };
-            ideas.push(idea);
-            selected = ideas.length - 1;
-            input.value = '';
             try {
-                const evaluation = await M.evaluateSystem(t);
-                idea.criteria = evaluation.criteria;
+                const data = await Workshop.request('POST', '/api/evaluate', { prompt: t });
+                const idea = data.idea;
                 statusEl.textContent = hasFailed(idea)
-                    ? 'نمودار آماده است. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.'
-                    : '';
+                    ? `ثبت شد: ${idea.points} امتیاز. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.`
+                    : `ثبت شد: ${idea.points} امتیاز. هر پنج شرط برقرار است.`;
+                input.value = '';
+                if (me) {
+                    me.used_state5 = true;
+                    me.points = idea.total_points || me.points;
+                }
             } catch (err) {
                 statusEl.textContent = err.message || String(err);
+                addBtn.disabled = !!(me && me.role === 'admin');
             }
-            addBtn.disabled = false;
-            save();
-            showChart(idea);
-        }
-
-        async function evaluateAt(idx) {
-            const idea = ideas[idx];
-            if (!idea || !idea.text) return;
-            addBtn.disabled = true;
-            examplesBtn.disabled = true;
-            statusEl.textContent = 'در حال ارزیابی پنج معیار…';
-            try {
-                const evaluation = await M.evaluateSystem(idea.text);
-                idea.criteria = evaluation.criteria;
-                idea.examples = [];
-                idea.examplesLoaded = false;
-                statusEl.textContent = hasFailed(idea)
-                    ? 'نمودار آماده است. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.'
-                    : '';
-            } catch (err) {
-                statusEl.textContent = err.message || String(err);
-            }
-            addBtn.disabled = false;
-            save();
-            showChart(idea);
         }
 
         async function loadExamples() {
@@ -173,31 +137,28 @@
             addBtn.disabled = true;
             statusEl.textContent = 'در حال گرفتن مثال‌های نقض…';
             try {
-                idea.examples = await M.fetchExamples(idea.text, idea.criteria);
-                idea.examplesLoaded = true;
-                statusEl.textContent = (idea.examples || []).length ? '' : 'برای شرط‌های نقض‌شده مثالی برنگشت.';
+                const data = await Workshop.request('POST', '/api/examples', {
+                    id: idea.id,
+                    prompt: idea.text,
+                    criteria: idea.criteria
+                });
+                statusEl.textContent = (data.examples || []).length ? '' : 'برای شرط‌های نقض‌شده مثالی برنگشت.';
             } catch (err) {
-                idea.examplesLoaded = true;
                 statusEl.textContent = err.message || String(err);
             }
-            addBtn.disabled = false;
-            save();
-            showChart(idea);
         }
 
         addBtn.addEventListener('click', addAndEvaluate);
         examplesBtn.addEventListener('click', loadExamples);
-        document.getElementById('clearIdeasBtn').addEventListener('click', () => {
-            ideas = [];
-            selected = -1;
-            statusEl.textContent = '';
-            save();
-        });
-        render();
-        M.checkBackend().then(ok => {
-            if (!ok) {
-                statusEl.textContent = 'API در دسترس نیست. برای اجرای محلی python llm.py را اجرا کنید. روی Vercel متغیر ORCAROUTER_API_KEY را تنظیم کنید.';
+
+        Workshop.startPolling((data, changed) => {
+            me = data.me;
+            ideas = data.ideas || [];
+            if (selected < 0 && me) {
+                const mine = ideas.findIndex(item => item.username === me.username);
+                if (mine >= 0) selected = mine;
             }
+            if (changed) render();
         });
     </script>
 </body>
