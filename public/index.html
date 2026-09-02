@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
+    
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>کارگاه انتخاب اجتماعی</title>
     <link rel="stylesheet" href="shared.css" />
     <style>
         body { padding: 16px; display: flex; justify-content: center; }
+        @media (max-width: 1520px) {
+            body { padding-left: 108px; }
+        }
         .app {
             max-width: 1400px; width: 100%;
             background: linear-gradient(150deg, rgba(var(--c-surface-strong), .82), rgba(var(--c-surface), .68)),
@@ -22,6 +26,17 @@
             display: flex; flex-wrap: wrap; align-items: center;
             gap: 12px 20px; margin-bottom: 16px;
         }
+        .app-logo {
+            max-height: 120px;
+            max-width: 240px;
+            width: auto;
+            height: auto;
+            display: block;
+            flex-shrink: 0;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 18px rgba(0, 0, 0, .45));
+        }
+        .app-logo[hidden] { display: none !important; }
         .header h1 {
             font-size: 26px; font-weight: 800; color: var(--c-text);
             display: flex; align-items: center; gap: 10px;
@@ -67,14 +82,17 @@
         .sub-tab-bar.hidden { display: none; }
         @media (max-width: 600px) {
             .app { padding: 16px 12px 24px; border-radius: 22px; }
+            .app-logo { max-height: 72px; max-width: 160px; }
             .tab-btn { padding: 6px 10px; font-size: 13px; }
             iframe { height: 500px; }
         }
     </style>
 </head>
 <body>
+    <img class="corner-logo" src="logo2.png" alt="" width="76" height="76">
     <div class="app">
         <div class="header">
+            <img class="app-logo" id="appLogo" alt="" hidden>
             <h1>کارگاه انتخاب اجتماعی</h1>
             <div class="user-chip" id="userChip"></div>
         </div>
@@ -324,10 +342,40 @@
             }
         }
 
+        function stateLogoSrc(leaf) {
+            if (!leaf) return '';
+            const match = String(leaf.group || '').match(/^s(\d+)$/);
+            return match ? ('state' + match[1] + '.png') : '';
+        }
+
+        function updateAppLogo() {
+            const img = document.getElementById('appLogo');
+            const src = stateLogoSrc(leaves[current]);
+            if (!src) {
+                img.hidden = true;
+                img.removeAttribute('src');
+                img.alt = '';
+                return;
+            }
+            img.onload = () => { img.hidden = false; };
+            img.onerror = () => {
+                img.hidden = true;
+                img.removeAttribute('src');
+            };
+            if (img.getAttribute('src') === src) {
+                img.hidden = false;
+                return;
+            }
+            img.hidden = true;
+            img.alt = 'لوگوی استیت ' + (String(leaves[current].group || '').replace(/^s/, '') || '');
+            img.src = src;
+        }
+
         function switchTo(index) {
             if (index < 0 || index >= leaves.length) return;
             current = index;
             iframe.src = leaves[index].file;
+            updateAppLogo();
             renderChrome();
         }
 
