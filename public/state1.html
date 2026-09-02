@@ -8,24 +8,23 @@
 </head>
 <body>
     <div class="container">
-        <h2>استیت ۱ – ایده‌های شما</h2>
+        <h2>استیت ۱ – ایده‌های کلاس</h2>
 
         <div class="card">
             <div class="card-header">
-                <span>افزودن ایده</span>
+                <span>ایده شما (هر نفر یک بار)</span>
                 <span class="badge" id="ideaCount">۰ ایده</span>
             </div>
             <textarea id="ideaInput" placeholder="مثلاً: هر کس بیشترین رأی اول را داشت برنده است"></textarea>
             <div class="row" style="margin-top:10px;">
                 <button class="primary" id="addIdeaBtn" type="button">ثبت ایده</button>
-                <button class="outline" id="clearIdeasBtn" type="button">حذف همه</button>
             </div>
             <div id="evalStatus" class="text-muted" style="margin-top:10px;"></div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <span>فهرست روش‌های پیشنهادی</span>
+                <span>فهرست روش‌های پیشنهادی همه</span>
             </div>
             <div id="ideaList"></div>
         </div>
@@ -38,12 +37,16 @@
         const list = document.getElementById('ideaList');
         const count = document.getElementById('ideaCount');
         const addBtn = document.getElementById('addIdeaBtn');
-        let ideas = M.loadIdeas().map(item => typeof item === 'string' ? { text: item } : item);
-
-        function save() { M.saveIdeas(ideas); render(); }
+        const statusEl = document.getElementById('evalStatus');
+        let ideas = [];
+        let me = null;
 
         function render() {
             count.textContent = ideas.length + ' ایده';
+            const used = !!(me && me.role === 'student' && me.used_state1);
+            addBtn.disabled = used;
+            input.disabled = used;
+            if (used) statusEl.textContent = statusEl.textContent || 'ایده شما ثبت شده است.';
             if (!ideas.length) {
                 list.innerHTML = '<div class="empty-state">هنوز ایده‌ای ثبت نشده است.</div>';
                 return;
@@ -51,37 +54,27 @@
             list.innerHTML = ideas.map((item, i) => `
                 <div class="idea-item">
                     <span class="badge">${i + 1}</span>
-                    <input data-idx="${i}" value="${String(item.text || '').replace(/"/g, '&quot;')}">
-                    <button class="remove-btn" data-idx="${i}" type="button">✕</button>
+                    <div class="idea-text">
+                        <strong>${M.escapeHtml(item.name || item.username)}</strong>
+                        <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
+                        <div>${M.escapeHtml(item.text || '')}</div>
+                    </div>
                 </div>`).join('');
-            list.querySelectorAll('input').forEach(inp => {
-                inp.addEventListener('change', () => {
-                    const idx = parseInt(inp.dataset.idx, 10);
-                    ideas[idx].text = inp.value.trim();
-                    ideas[idx].criteria = null;
-                    ideas[idx].examples = [];
-                    ideas[idx].examplesLoaded = false;
-                    save();
-                });
-            });
-            list.querySelectorAll('.remove-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    ideas.splice(parseInt(btn.dataset.idx, 10), 1);
-                    save();
-                });
-            });
         }
 
-        addBtn.addEventListener('click', () => {
+        addBtn.addEventListener('click', async () => {
             const t = input.value.trim();
             if (!t) return;
-            ideas.push({ text: t, criteria: null, examples: [], examplesLoaded: false });
-            input.value = '';
-            save();
-        });
-        document.getElementById('clearIdeasBtn').addEventListener('click', () => {
-            ideas = [];
-            save();
+            addBtn.disabled = true;
+            try {
+                await Workshop.request('POST', '/api/state1', { text: t });
+                input.value = '';
+                statusEl.textContent = 'ایده ثبت شد و برای همه دیده می‌شود.';
+                if (me) me.used_state1 = true;
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+                addBtn.disabled = false;
+            }
         });
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -89,7 +82,12 @@
                 addBtn.click();
             }
         });
-        render();
+
+        Workshop.startPolling((data, changed) => {
+            me = data.me;
+            ideas = data.state1_ideas || [];
+            if (changed) render();
+        });
     </script>
 </body>
 </html>

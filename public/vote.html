@@ -21,13 +21,7 @@
         <div class="card hidden" id="resultsCard">
             <div class="card-header"><span>نتیجه رأی‌گیری کلاس</span><span class="badge" id="voteCount">۰ رأی</span></div>
             <div id="scoreBars"></div>
-            <div class="results-grid">
-                <div>
-                    <canvas id="voteGraph" width="520" height="420"></canvas>
-                    <div class="legend" id="voteLegend"></div>
-                </div>
-                <div id="tally"></div>
-            </div>
+            <div id="tally" style="margin-top:16px;"></div>
         </div>
     </div>
     <script src="shared.js"></script>
@@ -43,6 +37,8 @@
         let revealed = false;
         let appliedMine = false;
 
+        function isStaff(user) { return user && (user.role === 'owner' || user.role === 'admin'); }
+
         function applyVote(vote) {
             if (!vote || !vote.rank) return;
             widget.setOrder(M.parseRanking(vote.rank));
@@ -56,11 +52,6 @@
             const plur = M.plurality(ranks, cands);
             M.renderScoreBars(document.getElementById('scoreBars'), plur.counts, cands);
             const counts = ranks.length ? M.buildCounts(ranks, cands) : null;
-            M.drawGraph(document.getElementById('voteGraph'), counts, {
-                candidates: cands,
-                highlightWinner: plur.winner
-            });
-            document.getElementById('voteLegend').innerHTML = M.legendHtml(counts, { candidates: cands });
             const borda = M.borda(ranks, cands);
             document.getElementById('tally').innerHTML = `
                 <p>برنده اکثریت نسبی: <strong>${plur.winner || '—'}</strong></p>
@@ -99,7 +90,7 @@
         Workshop.startPolling((data, changed) => {
             me = data.me;
             if (!changed) return;
-            presentBtn.classList.toggle('hidden', !(me && me.role === 'admin'));
+            presentBtn.classList.toggle('hidden', !isStaff(me));
             if (data.my_vote && !appliedMine) {
                 applyVote(data.my_vote);
                 appliedMine = true;

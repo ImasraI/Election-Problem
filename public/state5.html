@@ -45,7 +45,8 @@
         let me = null;
 
         function hasFailed(idea) {
-            return !!(idea && idea.criteria && Object.values(idea.criteria).some(v => !v));
+            if (!idea || !idea.criteria || idea.criteria.valid === false) return false;
+            return Object.entries(idea.criteria).some(([k, v]) => k !== 'valid' && !v);
         }
         function who(idea) {
             return `${idea.name || idea.username || ''} · ${idea.team || 'بدون تیم'} · ${idea.points || 0} امتیاز`;
@@ -67,7 +68,7 @@
             count.textContent = ideas.length + ' ایده';
             if (selected >= ideas.length) selected = ideas.length - 1;
             if (selected < 0 && ideas.length) selected = ideas.length - 1;
-            const used = !!(me && me.role !== 'admin' && me.used_state5);
+            const used = !!(me && me.role === 'student' && me.used_state5);
             addBtn.disabled = used;
             input.disabled = used;
             if (used) statusEl.textContent = statusEl.textContent || 'سهمیه ارسال شما استفاده شده است.';
@@ -85,9 +86,9 @@
                         <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
                         <div>${M.escapeHtml(item.text || '')}</div>
                     </div>
-                    <span class="badge ${item.criteria ? (Object.values(item.criteria).every(Boolean) ? 'condorcet' : 'cycle') : ''}">
-                        ${item.points || 0} امتیاز
-                    </span>
+                            <span class="badge ${item.criteria && item.criteria.valid === false ? 'cycle' : (item.criteria && Object.entries(item.criteria).filter(([k]) => k !== 'valid').every(([, v]) => v) ? 'condorcet' : 'cycle')}">
+                                ${item.criteria && item.criteria.valid === false ? 'روش نیست' : ((item.points || 0) + ' امتیاز')}
+                            </span>
                 </div>`).join('');
             list.querySelectorAll('[data-select]').forEach(row => {
                 row.addEventListener('click', () => {
@@ -113,9 +114,13 @@
             try {
                 const data = await Workshop.request('POST', '/api/evaluate', { prompt: t });
                 const idea = data.idea;
-                statusEl.textContent = hasFailed(idea)
-                    ? `ثبت شد: ${idea.points} امتیاز. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.`
-                    : `ثبت شد: ${idea.points} امتیاز. هر پنج شرط برقرار است.`;
+                if (idea.criteria && idea.criteria.valid === false) {
+                    statusEl.textContent = 'این متن یک روش رأی‌گیری نیست. امتیاز: ۰';
+                } else if (hasFailed(idea)) {
+                    statusEl.textContent = `ثبت شد: ${idea.points} امتیاز. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.`;
+                } else {
+                    statusEl.textContent = `ثبت شد: ${idea.points} امتیاز. هر پنج شرط برقرار است.`;
+                }
                 input.value = '';
                 if (me) {
                     me.used_state5 = true;
@@ -123,7 +128,7 @@
                 }
             } catch (err) {
                 statusEl.textContent = err.message || String(err);
-                addBtn.disabled = !!(me && me.role === 'admin');
+                addBtn.disabled = !!(me && me.role === 'student');
             }
         }
 

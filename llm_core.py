@@ -17,7 +17,15 @@ ENV_PATH = ROOT / ".env"
 
 CRITERIA_SYSTEM_PROMPT = """
 You are an expert in social choice theory. The user describes a voting
-method in Persian. Judge whether it GENERALLY satisfies each of five
+method in Persian. First decide whether the text actually describes a
+voting / social-choice method (how winners are chosen from ballots or
+rankings). Greetings, jokes, single words, or unrelated text are NOT
+voting methods.
+
+If it is NOT a voting method, output ONLY:
+{"valid": false, "AAW": false, "CWC": false, "UNAN": false, "MONO": false, "IIA": false}
+
+If it IS a voting method, judge whether it GENERALLY satisfies each of five
 criteria: AAW, CWC, UNAN, MONO, IIA.
 
 Short definitions:
@@ -33,12 +41,12 @@ Calibration (still reason about THIS method): plurality fails CWC and IIA;
 Borda fails CWC and IIA; IRV/Hare fails MONO, CWC, IIA; approval usually
 passes IIA.
 
-Output ONLY a valid json object with exactly these five boolean keys.
-true = the criterion holds in general. false = it can be violated.
+Output ONLY a valid json object with exactly these keys: valid and the five
+booleans. true = the criterion holds in general. false = it can be violated.
 No markdown, no extra keys, no explanation.
 
-Example of correct json:
-{"AAW": true, "CWC": false, "UNAN": true, "MONO": true, "IIA": false}
+Example of a real method:
+{"valid": true, "AAW": true, "CWC": false, "UNAN": true, "MONO": true, "IIA": false}
 """
 
 EXAMPLES_SYSTEM_PROMPT = """
@@ -244,12 +252,21 @@ def parse_criteria(text: str) -> dict:
     raw = (text or "").strip()
     if not raw:
         raise ValueError("Empty model response.")
+    zeros = {key: False for key in CRITERIA_KEYS}
     match = re.search(r"\{[\s\S]*\}", raw)
     if match:
         try:
             data = json.loads(match.group(0))
-            if isinstance(data, dict) and all(k in data for k in CRITERIA_KEYS):
-                return {key: _as_bool(data[key]) for key in CRITERIA_KEYS}
+            if isinstance(data, dict):
+                valid = True
+                if "valid" in data:
+                    valid = _as_bool(data.get("valid"))
+                if not valid:
+                    return {**zeros, "valid": False}
+                if all(k in data for k in CRITERIA_KEYS):
+                    out = {key: _as_bool(data[key]) for key in CRITERIA_KEYS}
+                    out["valid"] = True
+                    return out
         except json.JSONDecodeError:
             pass
     out = {}
@@ -263,10 +280,13 @@ def parse_criteria(text: str) -> dict:
             token = found.group(1).lower()
             out[key] = token in ("true", "برقرار")
     if len(out) == 5:
+        out["valid"] = True
         return out
     hits = re.findall(r"نتیجه:\s*(برقرار|نقض)", raw)
     if len(hits) >= 5:
-        return {key: (val == "برقرار") for key, val in zip(CRITERIA_KEYS, hits[:5])}
+        parsed = {key: (val == "برقرار") for key, val in zip(CRITERIA_KEYS, hits[:5])}
+        parsed["valid"] = True
+        return parsed
     raise ValueError("Empty model response.")
 
 
@@ -276,6 +296,8 @@ def evaluate_criteria(prompt: str) -> dict:
 
 
 def generate_examples(prompt: str, criteria: dict) -> list:
+    if criteria.get("valid") is False:
+        return []
     failed = [key for key in CRITERIA_KEYS if not criteria.get(key)]
     if not failed:
         return []
@@ -291,7 +313,13 @@ def generate_examples(prompt: str, criteria: dict) -> list:
 
 def normalize_criteria(raw) -> dict:
     data = raw if isinstance(raw, dict) else {}
-    return {key: _as_bool(data.get(key, True)) for key in CRITERIA_KEYS}
+    if data.get("valid") is False or data.get("valid") == "false":
+        out = {key: False for key in CRITERIA_KEYS}
+        out["valid"] = False
+        return out
+    out = {key: _as_bool(data.get(key, True)) for key in CRITERIA_KEYS}
+    out["valid"] = True
+    return out
 
 
 def parse_examples(text: str, failed_keys) -> list:

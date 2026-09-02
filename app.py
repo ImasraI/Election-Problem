@@ -147,6 +147,32 @@ async def admin_delete_user(request: Request):
         return fail(exc)
 
 
+@app.post("/api/admin/admins")
+async def admin_create_admin(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        created = workshop.create_admin(user, body.get("username") or "", body.get("password") or "")
+        return {"user": created}
+    except CATCH as exc:
+        return fail(exc)
+
+
+@app.post("/api/state1")
+async def state1_idea(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        idea = workshop.set_state1_idea(user, body.get("text") or "")
+        return {"idea": idea}
+    except CATCH as exc:
+        return fail(exc)
+
+
 @app.post("/api/admin/reset")
 def admin_reset(request: Request):
     user, err = require_user(request)

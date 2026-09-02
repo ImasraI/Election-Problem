@@ -40,7 +40,9 @@ DATA_PATH = DATA_DIR / "workshop.json"
 STORE_KEY = "kargah:workshop"
 LOCK_KEY = "kargah:workshop:lock"
 
-MAX_STUDENTS = 100
+MAX_STUDENTS = 120
+MAX_ADMINS = 20
+STUDENTS_PER_ADMIN = 6
 SESSION_TTL = 60 * 60 * 16
 PBKDF2_ROUNDS = 120_000
 CRITERIA_KEYS = ["AAW", "CWC", "UNAN", "MONO", "IIA"]
@@ -154,6 +156,27 @@ def _verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(test, dk)
 
 
+PANEL_IDS = [
+    "vote", "s1", "s2", "s3",
+    "s4", "s4-1", "s4-2", "s4-3", "s4-4", "s4-5",
+    "s5",
+    "s6", "s6-1", "s6-2", "s6-3", "s6-4", "s6-5",
+    "s7",
+]
+
+
+def is_owner(user) -> bool:
+    return (user or {}).get("role") == "owner"
+
+
+def is_admin(user) -> bool:
+    return (user or {}).get("role") == "admin"
+
+
+def is_staff(user) -> bool:
+    return is_owner(user) or is_admin(user)
+
+
 def _blank() -> dict:
     admin_password = os.environ.get("ADMIN_PASSWORD") or "admin"
     return {
@@ -161,17 +184,20 @@ def _blank() -> dict:
         "unlocked": ["vote"],
         "vote_revealed": False,
         "votes": {},
-        "ideas": [],
+        "state1_ideas": [],
         "arrows": default_arrows(),
         "users": {
             "admin": {
                 "username": "admin",
                 "password": _hash_password(admin_password),
-                "role": "admin",
-                "name": "ادمین",
+                "role": "owner",
+                "name": "مالک",
                 "team": "",
                 "points": 0,
                 "used_state5": False,
+                "used_state1": False,
+                "sponsor": "",
+                "unlocked": ["vote"],
             }
         },
         "sessions": {},
@@ -184,11 +210,21 @@ def _normalize(data: dict) -> dict:
     data.setdefault("vote_revealed", False)
     data.setdefault("votes", {})
     data.setdefault("ideas", [])
+    data.setdefault("state1_ideas", [])
     data.setdefault("arrows", default_arrows())
     data.setdefault("users", {})
     data.setdefault("sessions", {})
+    admin = data["users"].get("admin")
+    if admin and admin.get("role") == "admin" and not admin.get("sponsor"):
+        admin["role"] = "owner"
+        admin.setdefault("name", "مالک")
     if "admin" not in data["users"]:
         data["users"]["admin"] = _blank()["users"]["admin"]
+    for user in data["users"].values():
+        user.setdefault("sponsor", "")
+        user.setdefault("unlocked", ["vote"] if user.get("role") == "student" else list(PANEL_IDS))
+        if user.get("role") == "admin" and user.get("username") == "admin":
+            user["role"] = "owner"
     if "vote" not in data["unlocked"]:
         data["unlocked"] = ["vote"] + list(data["unlocked"])
     return data
@@ -242,8 +278,10 @@ def _public_user(user: dict) -> dict:
         "name": user.get("name") or "",
         "team": user.get("team") or "",
         "role": user.get("role") or "student",
+        "sponsor": user.get("sponsor") or "",
         "points": int(user.get("points") or 0),
         "used_state5": bool(user.get("used_state5")),
+        "used_state1": bool(user.get("used_state1")),
     }
 
 
@@ -284,7 +322,7 @@ def login(username: str, password: str, name: str, team: str) -> dict:
         user = data["users"].get(username)
         if not user or not _verify_password(password, user["password"]):
             raise ValueError("نام کاربری یا رمز عبور نادرست است.")
-        if user.get("role") != "admin":
+        if not is_staff(user):
             if not name:
                 raise ValueError("نام دانش‌آموز را وارد کنید.")
             if not team:
@@ -311,9 +349,9 @@ def logout(token: str) -> None:
         _dump(data)
 
 
-def create_student(admin: dict, username: str, password: str) -> dict:
-    if admin.get("role") != "admin":
-        raise PermissionError("فقط ادمین می‌تواند حساب بسازد.")
+def create_student(actor: dict, username: str, password: str) -> dict:
+    if not is_staff(actor):
+        raise PermissionError("فقط ادمین یا مالک می‌تواند حساب دانش‌آموز بسازد.")
     username = (username or "").strip()
     password = password or ""
     if not USERNAME_RE.match(username):
@@ -322,9 +360,13 @@ def create_student(admin: dict, username: str, password: str) -> dict:
         raise ValueError("رمز عبور حداقل ۴ نویسه باشد.")
     with _lock:
         data = _load()
-        students = [u for u in data["users"].values() if u.get("role") != "admin"]
+        students = [u for u in data["users"].values() if u.get("role") == "student"]
         if len(students) >= MAX_STUDENTS:
             raise ValueError(f"حداکثر {MAX_STUDENTS} حساب دانش‌آموز مجاز است.")
+        if is_admin(actor):
+            mine = [u for u in students if u.get("sponsor") == actor["username"]]
+            if len(mine) >= STUDENTS_PER_ADMIN:
+                raise ValueError(f"هر ادمین حداکثر {STUDENTS_PER_ADMIN} دانش‌آموز دارد.")
         if username in data["users"]:
             raise ValueError("این نام کاربری قبلاً ساخته شده است.")
         data["users"][username] = {
@@ -335,26 +377,71 @@ def create_student(admin: dict, username: str, password: str) -> dict:
             "team": "",
             "points": 0,
             "used_state5": False,
+            "used_state1": False,
+            "sponsor": actor["username"],
+            "unlocked": ["vote"],
         }
         _bump(data)
         _dump(data)
         return _public_user(data["users"][username])
 
 
-def delete_student(admin: dict, username: str) -> None:
-    if admin.get("role") != "admin":
-        raise PermissionError("فقط ادمین می‌تواند حساب حذف کند.")
+def create_admin(actor: dict, username: str, password: str) -> dict:
+    if not is_owner(actor):
+        raise PermissionError("فقط مالک می‌تواند ادمین بسازد.")
+    username = (username or "").strip()
+    password = password or ""
+    if not USERNAME_RE.match(username):
+        raise ValueError("نام کاربری باید ۲ تا ۳۲ نویسه انگلیسی، عدد یا ._- باشد.")
+    if len(password) < 4:
+        raise ValueError("رمز عبور حداقل ۴ نویسه باشد.")
+    with _lock:
+        data = _load()
+        admins = [u for u in data["users"].values() if u.get("role") == "admin"]
+        if len(admins) >= MAX_ADMINS:
+            raise ValueError(f"حداکثر {MAX_ADMINS} ادمین مجاز است.")
+        if username in data["users"]:
+            raise ValueError("این نام کاربری قبلاً ساخته شده است.")
+        data["users"][username] = {
+            "username": username,
+            "password": _hash_password(password),
+            "role": "admin",
+            "name": "",
+            "team": "",
+            "points": 0,
+            "used_state5": False,
+            "used_state1": False,
+            "sponsor": actor["username"],
+            "unlocked": list(PANEL_IDS),
+        }
+        _bump(data)
+        _dump(data)
+        return _public_user(data["users"][username])
+
+
+def delete_student(actor: dict, username: str) -> None:
+    if not is_staff(actor):
+        raise PermissionError("اجازه حذف ندارید.")
     username = (username or "").strip()
     with _lock:
         data = _load()
         user = data["users"].get(username)
         if not user:
             raise ValueError("حساب پیدا نشد.")
+        if user.get("role") == "owner":
+            raise ValueError("مالک را نمی‌توان حذف کرد.")
         if user.get("role") == "admin":
-            raise ValueError("حساب ادمین را نمی‌توان حذف کرد.")
+            if not is_owner(actor):
+                raise PermissionError("فقط مالک می‌تواند ادمین را حذف کند.")
+            for other in data["users"].values():
+                if other.get("sponsor") == username:
+                    other["sponsor"] = actor["username"]
+        elif is_admin(actor) and user.get("sponsor") != actor["username"]:
+            raise PermissionError("فقط دانش‌آموزان خودتان را می‌توانید حذف کنید.")
         data["users"].pop(username, None)
         data["votes"].pop(username, None)
         data["ideas"] = [idea for idea in data["ideas"] if idea.get("username") != username]
+        data["state1_ideas"] = [idea for idea in data.get("state1_ideas") or [] if idea.get("username") != username]
         data["sessions"] = {
             tok: sess for tok, sess in data["sessions"].items() if sess.get("username") != username
         }
@@ -362,35 +449,51 @@ def delete_student(admin: dict, username: str) -> None:
         _dump(data)
 
 
-def list_users(admin: dict) -> list:
-    if admin.get("role") != "admin":
-        raise PermissionError("فقط ادمین.")
+def list_users(actor: dict) -> list:
+    if not is_staff(actor):
+        raise PermissionError("فقط ادمین یا مالک.")
     with _lock:
         data = _load()
-        users = [_public_user(u) for u in data["users"].values()]
-        users.sort(key=lambda u: (0 if u["role"] == "admin" else 1, u["username"]))
+        users = []
+        for u in data["users"].values():
+            if is_owner(actor) or u["username"] == actor["username"] or u.get("sponsor") == actor["username"]:
+                users.append(_public_user(u))
+        users.sort(key=lambda u: ({"owner": 0, "admin": 1}.get(u["role"], 2), u["username"]))
         return users
 
 
-def unlock_panel(admin: dict, panel_id: str) -> list:
-    if admin.get("role") != "admin":
-        raise PermissionError("فقط ادمین می‌تواند پنل باز کند.")
+def unlock_panel(actor: dict, panel_id: str) -> list:
+    if not is_staff(actor):
+        raise PermissionError("فقط ادمین یا مالک می‌تواند پنل باز کند.")
     panel_id = (panel_id or "").strip()
     if not panel_id:
         raise ValueError("شناسه پنل لازم است.")
+    extras = [panel_id]
+    if panel_id.startswith("s4-"):
+        extras.append("s4")
+    if panel_id.startswith("s6-"):
+        extras.append("s6")
     with _lock:
         data = _load()
-        unlocked = list(data.get("unlocked") or [])
-        if panel_id not in unlocked:
-            unlocked.append(panel_id)
-        if panel_id.startswith("s4-") and "s4" not in unlocked:
-            unlocked.append("s4")
-        if panel_id.startswith("s6-") and "s6" not in unlocked:
-            unlocked.append("s6")
-        data["unlocked"] = unlocked
+        if is_owner(actor):
+            unlocked = list(data.get("unlocked") or [])
+            for item in extras:
+                if item not in unlocked:
+                    unlocked.append(item)
+            data["unlocked"] = unlocked
+            result = unlocked
+        else:
+            for user in data["users"].values():
+                if user.get("role") == "student" and user.get("sponsor") == actor["username"]:
+                    personal = list(user.get("unlocked") or ["vote"])
+                    for item in extras:
+                        if item not in personal:
+                            personal.append(item)
+                    user["unlocked"] = personal
+            result = sorted(set((data.get("unlocked") or ["vote"]) + extras))
         _bump(data)
         _dump(data)
-        return unlocked
+        return result
 
 
 def set_vote(user: dict, rank: str) -> dict:
@@ -401,7 +504,7 @@ def set_vote(user: dict, rank: str) -> dict:
         raise ValueError("رتبه‌بندی باید دقیقاً A و B و C باشد.")
     with _lock:
         data = _load()
-        if data.get("vote_revealed") and user.get("role") != "admin":
+        if data.get("vote_revealed") and not is_staff(user):
             raise ValueError("رأی‌گیری تمام شده و دیگر نمی‌توان رأی را عوض کرد.")
         data["votes"][user["username"]] = {
             "rank": ">".join(parts),
@@ -413,9 +516,9 @@ def set_vote(user: dict, rank: str) -> dict:
         return data["votes"][user["username"]]
 
 
-def present_votes(admin: dict) -> dict:
-    if admin.get("role") != "admin":
-        raise PermissionError("فقط ادمین می‌تواند نتیجه را نشان بدهد.")
+def present_votes(actor: dict) -> dict:
+    if not is_staff(actor):
+        raise PermissionError("فقط ادمین یا مالک می‌تواند نتیجه را نشان بدهد.")
     with _lock:
         data = _load()
         data["vote_revealed"] = True
@@ -463,12 +566,18 @@ def submit_idea(user: dict, prompt: str) -> dict:
         stored = data["users"].get(user["username"])
         if not stored:
             raise ValueError("حساب پیدا نشد.")
-        if stored.get("role") != "admin" and stored.get("used_state5"):
+        if stored.get("role") == "student" and stored.get("used_state5"):
             raise ValueError("هر نفر فقط یک بار می‌تواند روش خود را بفرستد.")
 
     criteria = evaluate_criteria(prompt)
-    passed = sum(1 for key in CRITERIA_KEYS if criteria.get(key))
-    points = passed * POINTS_PER_CRITERION
+    valid = criteria.get("valid", True)
+    if not valid:
+        criteria = {key: False for key in CRITERIA_KEYS}
+        criteria["valid"] = False
+        points = 0
+    else:
+        passed = sum(1 for key in CRITERIA_KEYS if criteria.get(key))
+        points = passed * POINTS_PER_CRITERION
     idea = {
         "id": secrets.token_hex(8),
         "username": user["username"],
@@ -485,7 +594,7 @@ def submit_idea(user: dict, prompt: str) -> dict:
         stored = data["users"].get(user["username"])
         if not stored:
             raise ValueError("حساب پیدا نشد.")
-        if stored.get("role") != "admin":
+        if stored.get("role") == "student":
             if stored.get("used_state5"):
                 raise ValueError("هر نفر فقط یک بار می‌تواند روش خود را بفرستد.")
             stored["used_state5"] = True
@@ -518,7 +627,7 @@ def add_examples(user: dict, idea_id: str = "", prompt: str = "", criteria=None)
             )
         if idea is None:
             raise ValueError("ابتدا روش را ارزیابی کنید.")
-        if user.get("role") != "admin" and idea.get("username") != user["username"]:
+        if user.get("role") == "student" and idea.get("username") != user["username"]:
             raise PermissionError("فقط برای روش خودتان می‌توانید مثال بگیرید.")
         text = idea["text"]
         crit = normalize_criteria(idea.get("criteria") or criteria)
@@ -537,20 +646,70 @@ def add_examples(user: dict, idea_id: str = "", prompt: str = "", criteria=None)
     return idea
 
 
-def reset_workshop(admin: dict) -> None:
-    if admin.get("role") != "admin":
-        raise PermissionError("فقط ادمین.")
+def set_state1_idea(user: dict, text: str) -> dict:
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("ایده خالی است.")
     with _lock:
         data = _load()
-        data["unlocked"] = ["vote"]
-        data["vote_revealed"] = False
-        data["votes"] = {}
-        data["ideas"] = []
-        data["arrows"] = default_arrows()
-        for user in data["users"].values():
-            if user.get("role") != "admin":
-                user["points"] = 0
-                user["used_state5"] = False
+        stored = data["users"].get(user["username"])
+        if not stored:
+            raise ValueError("حساب پیدا نشد.")
+        ideas = list(data.get("state1_ideas") or [])
+        existing = next((item for item in ideas if item.get("username") == user["username"]), None)
+        if existing and stored.get("role") == "student":
+            raise ValueError("هر نفر فقط یک ایده می‌تواند بفرستد.")
+        idea = {
+            "id": secrets.token_hex(8),
+            "username": user["username"],
+            "name": stored.get("name") or user["username"],
+            "team": stored.get("team") or "",
+            "text": text,
+        }
+        if existing:
+            existing.update(idea)
+            idea = existing
+        else:
+            ideas.append(idea)
+        data["state1_ideas"] = ideas
+        stored["used_state1"] = True
+        _bump(data)
+        _dump(data)
+        return deepcopy(idea)
+
+
+def reset_workshop(actor: dict) -> None:
+    if not is_staff(actor):
+        raise PermissionError("فقط ادمین یا مالک.")
+    with _lock:
+        data = _load()
+        if is_owner(actor):
+            data["unlocked"] = ["vote"]
+            data["vote_revealed"] = False
+            data["votes"] = {}
+            data["ideas"] = []
+            data["state1_ideas"] = []
+            data["arrows"] = default_arrows()
+            for user in data["users"].values():
+                if user.get("role") == "student":
+                    user["points"] = 0
+                    user["used_state5"] = False
+                    user["used_state1"] = False
+                    user["unlocked"] = ["vote"]
+        else:
+            mine = actor["username"]
+            data["votes"] = {k: v for k, v in (data.get("votes") or {}).items()
+                             if (data["users"].get(k) or {}).get("sponsor") != mine}
+            data["ideas"] = [idea for idea in data.get("ideas") or []
+                             if (data["users"].get(idea.get("username")) or {}).get("sponsor") != mine]
+            data["state1_ideas"] = [idea for idea in data.get("state1_ideas") or []
+                                    if (data["users"].get(idea.get("username")) or {}).get("sponsor") != mine]
+            for user in data["users"].values():
+                if user.get("role") == "student" and user.get("sponsor") == mine:
+                    user["points"] = 0
+                    user["used_state5"] = False
+                    user["used_state1"] = False
+                    user["unlocked"] = ["vote"]
         _bump(data)
         _dump(data)
 
@@ -559,19 +718,25 @@ def snapshot(user: dict) -> dict:
     with _lock:
         data = _load()
         stored = data["users"].get(user["username"]) or user
-        is_admin = stored.get("role") == "admin"
+        staff = is_staff(stored)
         votes = []
-        if data.get("vote_revealed") or is_admin:
+        if data.get("vote_revealed") or staff:
             votes = list(data["votes"].values())
+        global_unlocked = list(data.get("unlocked") or ["vote"])
+        personal = list(stored.get("unlocked") or ["vote"])
+        if staff:
+            unlocked = list(PANEL_IDS)
+        else:
+            unlocked = sorted(set(global_unlocked + personal))
         return {
             "version": data.get("version") or 0,
             "me": _public_user(stored),
-            "unlocked": list(data.get("unlocked") or ["vote"]),
+            "unlocked": unlocked,
             "vote_revealed": bool(data.get("vote_revealed")),
             "my_vote": (data.get("votes") or {}).get(user["username"]),
             "votes": votes,
             "ideas": deepcopy(data.get("ideas") or []),
-            "arrows": deepcopy(data.get("arrows") or default_arrows()),
+            "state1_ideas": deepcopy(data.get("state1_ideas") or []),
             "store": store_kind(),
             "live": live_classroom_ok(),
         }

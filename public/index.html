@@ -80,11 +80,16 @@
         </div>
 
         <div class="card admin-panel hidden" id="adminPanel">
-            <div class="card-header"><span>حساب‌های دانش‌آموز (فقط ادمین)</span></div>
-            <div class="admin-create">
-                <input id="newUser" placeholder="نام کاربری">
+            <div class="card-header"><span id="adminPanelTitle">حساب‌ها</span></div>
+            <div class="admin-create hidden" id="ownerCreate">
+                <input id="newAdmin" placeholder="نام کاربری ادمین">
+                <input id="newAdminPass" placeholder="رمز ادمین" type="password">
+                <button class="primary" id="createAdminBtn" type="button">ساخت ادمین</button>
+            </div>
+            <div class="admin-create" style="margin-top:8px;">
+                <input id="newUser" placeholder="نام کاربری دانش‌آموز">
                 <input id="newPass" placeholder="رمز عبور" type="password">
-                <button class="primary" id="createUserBtn" type="button">ساخت حساب</button>
+                <button class="primary" id="createUserBtn" type="button">ساخت دانش‌آموز</button>
                 <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی کارگاه</button>
             </div>
             <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
@@ -144,7 +149,13 @@
         let me = null;
         let unlocked = ['vote'];
 
-        function isAdmin() { return me && me.role === 'admin'; }
+        function isStaff() { return me && (me.role === 'owner' || me.role === 'admin'); }
+        function isOwner() { return me && me.role === 'owner'; }
+        function roleLabel(role) {
+            if (role === 'owner') return 'مالک';
+            if (role === 'admin') return 'ادمین';
+            return 'دانش‌آموز';
+        }
         function isUnlocked(id) { return unlocked.indexOf(id) >= 0; }
         function groupUnlocked(g) {
             if (g.children) return g.children.some(c => isUnlocked(c.id)) || isUnlocked(g.id);
@@ -156,7 +167,7 @@
             return open ? open.id : g.children[0].id;
         }
         function studentLabel(item, parentLocked) {
-            if (isAdmin()) return item.label;
+            if (isStaff()) return item.label;
             if (item.children) return groupUnlocked(item) ? item.label : '';
             if (NAMED_WHEN_LOCKED.has(item.id) || isUnlocked(item.id)) return item.label;
             if (parentLocked) return '';
@@ -172,11 +183,15 @@
                 <button class="outline" id="logoutBtn" type="button">خروج</button>
             `;
             document.getElementById('logoutBtn').addEventListener('click', () => Workshop.logout());
-            document.getElementById('adminPanel').classList.toggle('hidden', !isAdmin());
+            document.getElementById('adminPanel').classList.toggle('hidden', !isStaff());
+            document.getElementById('ownerCreate').classList.toggle('hidden', !isOwner());
+            document.getElementById('adminPanelTitle').textContent = isOwner()
+                ? 'مالک: ادمین‌ها و دانش‌آموزان'
+                : 'ادمین: حداکثر ۶ دانش‌آموز خودتان';
         }
 
         async function refreshUsers() {
-            if (!isAdmin()) return;
+            if (!isStaff()) return;
             try {
                 const data = await Workshop.request('GET', '/api/admin/users');
                 const rows = (data.users || []).map(u => `
@@ -184,13 +199,14 @@
                         <td>${u.username}</td>
                         <td>${u.name || '—'}</td>
                         <td>${u.team || '—'}</td>
-                        <td>${u.role === 'admin' ? 'ادمین' : 'دانش‌آموز'}</td>
+                        <td>${roleLabel(u.role)}</td>
+                        <td>${u.sponsor || '—'}</td>
                         <td>${u.points}</td>
                         <td>${u.used_state5 ? 'ارسال شده' : '—'}</td>
-                        <td>${u.role === 'admin' ? '' : `<button class="remove-btn" data-del="${u.username}" type="button">حذف</button>`}</td>
+                        <td>${u.role === 'owner' ? '' : `<button class="remove-btn" data-del="${u.username}" type="button">حذف</button>`}</td>
                     </tr>`).join('');
                 document.getElementById('userTable').innerHTML = `
-                    <thead><tr><th>کاربری</th><th>نام</th><th>تیم</th><th>نقش</th><th>امتیاز</th><th>استیت ۵</th><th></th></tr></thead>
+                    <thead><tr><th>کاربری</th><th>نام</th><th>تیم</th><th>نقش</th><th>ادمین</th><th>امتیاز</th><th>استیت ۵</th><th></th></tr></thead>
                     <tbody>${rows}</tbody>`;
                 document.querySelectorAll('[data-del]').forEach(btn => {
                     btn.addEventListener('click', async () => {
@@ -207,13 +223,13 @@
             const leaf = leaves[current];
             tabBar.innerHTML = GROUPS.map(g => {
                 const open = groupUnlocked(g);
-                const locked = !isAdmin() && !open;
+                const locked = !isStaff() && !open;
                 const label = studentLabel(g);
                 const cls = [
                     'tab-btn',
                     g.id === leaf.group ? 'active' : '',
                     locked ? 'locked' : '',
-                    isAdmin() && !open ? 'admin-unlock' : ''
+                    isStaff() && !open ? 'admin-unlock' : ''
                 ].join(' ');
                 return `<button class="${cls}" data-group="${g.id}">${label || '&nbsp;'}</button>`;
             }).join('') + `
@@ -227,13 +243,13 @@
                 subTabBar.classList.remove('hidden');
                 subTabBar.innerHTML = group.children.map(c => {
                     const open = isUnlocked(c.id);
-                    const locked = !isAdmin() && !open;
-                    const label = isAdmin() || open ? c.label : '';
+                    const locked = !isStaff() && !open;
+                    const label = isStaff() || open ? c.label : '';
                     const cls = [
                         'sub-tab-btn',
                         c.id === leaf.id ? 'active' : '',
                         locked ? 'locked' : '',
-                        isAdmin() && !open ? 'admin-unlock' : ''
+                        isStaff() && !open ? 'admin-unlock' : ''
                     ].join(' ');
                     return `<button class="${cls}" data-id="${c.id}">${label || '&nbsp;'}</button>`;
                 }).join('');
@@ -260,12 +276,9 @@
         async function onLeafClick(id) {
             const idx = leaves.findIndex(l => l.id === id);
             if (idx < 0) return;
-            if (!isAdmin() && !isUnlocked(id)) return;
-            if (isAdmin() && !isUnlocked(id)) {
-                try {
-                    const data = await Workshop.unlock(id);
-                    unlocked = data.unlocked || unlocked.concat([id]);
-                } catch (e) { return; }
+            if (!isStaff() && !isUnlocked(id)) return;
+            if (isStaff()) {
+                try { await Workshop.unlock(id); } catch (e) { /* still open the panel */ }
             }
             switchTo(idx);
         }
@@ -273,7 +286,7 @@
         function step(dir) {
             let idx = current + dir;
             while (idx >= 0 && idx < leaves.length) {
-                if (isAdmin() || isUnlocked(leaves[idx].id)) {
+                if (isStaff() || isUnlocked(leaves[idx].id)) {
                     onLeafClick(leaves[idx].id);
                     return;
                 }
@@ -295,6 +308,22 @@
             } catch (e) { /* ignore */ }
         });
 
+        document.getElementById('createAdminBtn').addEventListener('click', async () => {
+            const status = document.getElementById('adminStatus');
+            status.textContent = '';
+            try {
+                await Workshop.request('POST', '/api/admin/admins', {
+                    username: document.getElementById('newAdmin').value,
+                    password: document.getElementById('newAdminPass').value
+                });
+                document.getElementById('newAdmin').value = '';
+                document.getElementById('newAdminPass').value = '';
+                status.textContent = 'ادمین ساخته شد.';
+                refreshUsers();
+            } catch (err) {
+                status.textContent = err.message || String(err);
+            }
+        });
         document.getElementById('createUserBtn').addEventListener('click', async () => {
             const status = document.getElementById('adminStatus');
             status.textContent = '';
@@ -324,8 +353,8 @@
             unlocked = data.unlocked || ['vote'];
             if (!changed) return;
             renderUser();
-            if (isAdmin()) refreshUsers();
-            if (!isAdmin() && leaves[current] && !isUnlocked(leaves[current].id)) {
+            if (isStaff()) refreshUsers();
+            if (!isStaff() && leaves[current] && !isUnlocked(leaves[current].id)) {
                 const fallback = leaves.findIndex(l => isUnlocked(l.id));
                 switchTo(fallback < 0 ? 0 : fallback);
             } else {
