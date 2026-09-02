@@ -521,6 +521,24 @@ ul.plain li { margin-bottom: 4px; }
     border-color: rgba(103, 232, 249, .45);
     background: rgba(57, 211, 255, .08);
 }
+.idea-item .idea-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.idea-item .idea-actions button {
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 13px;
+}
+.idea-note {
+    font-size: 13px;
+    color: var(--c-muted);
+    margin: 0 0 12px;
+    line-height: 1.8;
+}
 .edit-btn { padding: 4px 10px; font-size: 12px; }
 .method-hero p { font-size: 15px; line-height: 1.9; }
 .hidden { display: none !important; }

@@ -38,7 +38,113 @@
         let appliedMine = false;
 
         // Later, set this to lock a specific shown result. Leave null for a random canned result.
-        const FIXED_RESULT = null;
+        const FIXED_RESULT = {
+                votes: [
+                    { name: 'Ali', team: '1', rank: 'A>B>C' },
+                    { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Neda', team: '2', rank: 'A>B>C' },
+                  { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Neda', team: '2', rank: 'A>B>C' },
+                  { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Neda', team: '2', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                { name: 'Ali', team: '1', rank: 'A>B>C' },
+                
+                    { name: 'Sara', team: '1', rank: 'A>C>B' },
+                    { name: 'Sara', team: '1', rank: 'A>C>B' },
+                    { name: 'Sara', team: '1', rank: 'A>C>B' },
+                { name: 'Sara', team: '1', rank: 'A>C>B' },
+                { name: 'Sara', team: '1', rank: 'A>C>B' },
+                { name: 'Sara', team: '1', rank: 'A>C>B' },
+                { name: 'Sara', team: '1', rank: 'A>C>B' },
+
+                    { name: 'Reza', team: '2', rank: 'B>A>C' },
+                    { name: 'Reza', team: '2', rank: 'B>A>C' },
+                    { name: 'Reza', team: '2', rank: 'B>A>C' },
+                    { name: 'Reza', team: '2', rank: 'B>A>C' },
+                    { name: 'Reza', team: '2', rank: 'B>A>C' },
+                { name: 'Reza', team: '2', rank: 'B>A>C' },
+
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                  { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Sina', team: '2', rank: 'C>A>B' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+                { name: 'Amirreza', team: '2', rank: 'C>B>A' },
+
+
+
+
+
+
+                    
+                    
+                    
+                    
+                ]
+            };
 
         function isStaff(user) { return user && (user.role === 'owner' || user.role === 'admin'); }
 

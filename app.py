@@ -186,6 +186,24 @@ async def state1_idea(request: Request):
         return fail(exc)
 
 
+@app.post("/api/state1/evaluate")
+async def state1_evaluate(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    try:
+        idea = workshop.process_state1_idea(user, body.get("id") or "")
+        return {"criteria": idea["criteria"], "prompt": idea["text"], "idea": idea}
+    except CATCH as exc:
+        return fail(exc)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=502)
+
+
 @app.post("/api/admin/reset")
 def admin_reset(request: Request):
     user, err = require_user(request)

@@ -679,6 +679,17 @@ def reset_arrows(admin: dict) -> list:
     return set_arrows(admin, default_arrows())
 
 
+def _score_prompt(prompt: str) -> tuple:
+    criteria = evaluate_criteria(prompt)
+    valid = criteria.get("valid", True)
+    if not valid:
+        criteria = {key: False for key in CRITERIA_KEYS}
+        criteria["valid"] = False
+        return criteria, 0
+    passed = sum(1 for key in CRITERIA_KEYS if criteria.get(key))
+    return criteria, passed * POINTS_PER_CRITERION
+
+
 def submit_idea(user: dict, prompt: str) -> dict:
     prompt = (prompt or "").strip()
     if not prompt:
@@ -691,15 +702,7 @@ def submit_idea(user: dict, prompt: str) -> dict:
         if stored.get("role") == "student" and stored.get("used_state5"):
             raise ValueError("هر نفر فقط یک بار می‌تواند روش خود را بفرستد.")
 
-    criteria = evaluate_criteria(prompt)
-    valid = criteria.get("valid", True)
-    if not valid:
-        criteria = {key: False for key in CRITERIA_KEYS}
-        criteria["valid"] = False
-        points = 0
-    else:
-        passed = sum(1 for key in CRITERIA_KEYS if criteria.get(key))
-        points = passed * POINTS_PER_CRITERION
+    criteria, points = _score_prompt(prompt)
     idea = {
         "id": secrets.token_hex(8),
         "username": user["username"],
@@ -803,6 +806,95 @@ def set_state1_idea(user: dict, text: str) -> dict:
         _bump(data)
         _dump(data)
         return deepcopy(idea)
+
+
+def process_state1_idea(actor: dict, idea_id: str) -> dict:
+    if not is_staff(actor):
+        raise PermissionError("فقط Mentor یا Admin می‌تواند ایده استیت ۱ را برای رأی‌دهنده‌ها ارزیابی کند.")
+    idea_id = (idea_id or "").strip()
+    if not idea_id:
+        raise ValueError("ایده مشخص نشده.")
+
+    with _lock:
+        data = _load()
+        stored = data["users"].get(actor["username"])
+        if not stored:
+            raise ValueError("حساب پیدا نشد.")
+        src = next((item for item in (data.get("state1_ideas") or []) if item.get("id") == idea_id), None)
+        if src is None:
+            raise ValueError("ایده استیت ۱ پیدا نشد.")
+        if _idea_class(data, src) != _class_key(stored):
+            raise PermissionError("این ایده مال کلاس شما نیست.")
+        if src.get("evaluated_id"):
+            existing = next((item for item in data.get("ideas") or [] if item.get("id") == src["evaluated_id"]), None)
+            if existing:
+                idea = deepcopy(existing)
+                author = data["users"].get(existing.get("username") or "")
+                idea["used_state5"] = True
+                idea["total_points"] = int((author or {}).get("points") or existing.get("points") or 0)
+                return idea
+        text = (src.get("text") or "").strip()
+        if not text:
+            raise ValueError("متن ایده خالی است.")
+        author_name = src.get("username") or ""
+        author = data["users"].get(author_name)
+        if author and author.get("role") == "student" and author.get("used_state5"):
+            raise ValueError("این رأی‌دهنده قبلاً در استیت ۵ روش فرستاده است.")
+        src_name = src.get("name") or author_name
+        src_team = src.get("team") or ""
+        src_class = src.get("class_id") or _idea_class(data, src)
+
+    criteria, points = _score_prompt(text)
+    idea = {
+        "id": secrets.token_hex(8),
+        "username": author_name,
+        "name": src_name,
+        "team": src_team,
+        "text": text,
+        "criteria": criteria,
+        "examples": [],
+        "examplesLoaded": False,
+        "points": points,
+        "from_state1_id": idea_id,
+        "class_id": src_class,
+    }
+    with _lock:
+        data = _load()
+        stored = data["users"].get(actor["username"])
+        if not stored:
+            raise ValueError("حساب پیدا نشد.")
+        src = next((item for item in (data.get("state1_ideas") or []) if item.get("id") == idea_id), None)
+        if src is None:
+            raise ValueError("ایده استیت ۱ پیدا نشد.")
+        if _idea_class(data, src) != _class_key(stored):
+            raise PermissionError("این ایده مال کلاس شما نیست.")
+        if src.get("evaluated_id"):
+            existing = next((item for item in data.get("ideas") or [] if item.get("id") == src["evaluated_id"]), None)
+            if existing:
+                idea = deepcopy(existing)
+                author = data["users"].get(existing.get("username") or "")
+                idea["used_state5"] = True
+                idea["total_points"] = int((author or {}).get("points") or existing.get("points") or 0)
+                return idea
+        author = data["users"].get(author_name)
+        if author and author.get("role") == "student" and author.get("used_state5"):
+            raise ValueError("این رأی‌دهنده قبلاً در استیت ۵ روش فرستاده است.")
+        if author:
+            idea["name"] = author.get("name") or idea["name"]
+            idea["team"] = author.get("team") or idea["team"]
+            idea["class_id"] = _class_key(author)
+            if author.get("role") == "student":
+                author["used_state5"] = True
+                author["points"] = int(author.get("points") or 0) + points
+        src["evaluated_id"] = idea["id"]
+        src["processed"] = True
+        data.setdefault("ideas", []).append(idea)
+        _bump(data)
+        _dump(data)
+        idea = deepcopy(idea)
+        idea["used_state5"] = True
+        idea["total_points"] = int((author or {}).get("points") or points)
+        return idea
 
 
 def reset_workshop(actor: dict) -> None:
