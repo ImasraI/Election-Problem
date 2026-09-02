@@ -19,10 +19,16 @@ app.add_middleware(
 )
 
 STATIC = Path(__file__).resolve().parent / "public"
+CATCH = (ValueError, PermissionError, RuntimeError)
 
 
 def fail(exc, code=400):
-    status = 403 if isinstance(exc, PermissionError) else code
+    if isinstance(exc, PermissionError):
+        status = 403
+    elif isinstance(exc, RuntimeError):
+        status = 503
+    else:
+        status = code
     return JSONResponse({"error": str(exc)}, status_code=status)
 
 
@@ -36,7 +42,12 @@ def require_user(request: Request):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "model": MODEL_NAME}
+    return {
+        "ok": True,
+        "model": MODEL_NAME,
+        "store": workshop.store_kind(),
+        "live": workshop.live_classroom_ok(),
+    }
 
 
 @app.post("/api/auth/login")
@@ -46,15 +57,16 @@ async def auth_login(request: Request):
     except Exception:
         return JSONResponse({"error": "Body must be JSON."}, status_code=400)
     try:
-        result = workshop.login(
+        return workshop.login(
             body.get("username") or "",
             body.get("password") or "",
             body.get("name") or "",
             body.get("team") or "",
         )
-        return result
     except ValueError as exc:
         return fail(exc, 401)
+    except RuntimeError as exc:
+        return fail(exc)
 
 
 @app.post("/api/auth/logout")
@@ -68,7 +80,10 @@ def auth_me(request: Request):
     user, err = require_user(request)
     if err:
         return err
-    return {"user": workshop.snapshot(user)["me"]}
+    try:
+        return {"user": workshop.snapshot(user)["me"]}
+    except RuntimeError as exc:
+        return fail(exc)
 
 
 @app.get("/api/sync")
@@ -76,7 +91,10 @@ def sync(request: Request):
     user, err = require_user(request)
     if err:
         return err
-    return workshop.snapshot(user)
+    try:
+        return workshop.snapshot(user)
+    except RuntimeError as exc:
+        return fail(exc)
 
 
 @app.post("/api/unlock")
@@ -88,7 +106,7 @@ async def unlock(request: Request):
         body = await request.json()
         unlocked = workshop.unlock_panel(user, body.get("id") or "")
         return {"unlocked": unlocked}
-    except (ValueError, PermissionError) as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -101,7 +119,7 @@ async def admin_create_user(request: Request):
         body = await request.json()
         created = workshop.create_student(user, body.get("username") or "", body.get("password") or "")
         return {"user": created}
-    except (ValueError, PermissionError) as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -112,7 +130,7 @@ def admin_list_users(request: Request):
         return err
     try:
         return {"users": workshop.list_users(user)}
-    except PermissionError as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -125,7 +143,7 @@ async def admin_delete_user(request: Request):
         body = await request.json()
         workshop.delete_student(user, body.get("username") or "")
         return {"ok": True}
-    except (ValueError, PermissionError) as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -137,7 +155,7 @@ def admin_reset(request: Request):
     try:
         workshop.reset_workshop(user)
         return {"ok": True}
-    except PermissionError as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -150,7 +168,7 @@ async def vote_cast(request: Request):
         body = await request.json()
         ballot = workshop.set_vote(user, body.get("rank") or "")
         return {"vote": ballot}
-    except (ValueError, PermissionError) as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -161,7 +179,7 @@ def vote_present(request: Request):
         return err
     try:
         return workshop.present_votes(user)
-    except PermissionError as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -174,7 +192,7 @@ async def arrows_set(request: Request):
         body = await request.json()
         profiles = workshop.set_arrows(user, body.get("profiles"))
         return {"arrows": profiles}
-    except (ValueError, PermissionError) as exc:
+    except CATCH as exc:
         return fail(exc)
 
 
@@ -190,9 +208,7 @@ async def evaluate(request: Request):
     try:
         idea = workshop.submit_idea(user, body.get("prompt") or "")
         return {"criteria": idea["criteria"], "prompt": idea["text"], "idea": idea}
-    except ValueError as exc:
-        return fail(exc)
-    except PermissionError as exc:
+    except CATCH as exc:
         return fail(exc)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=502)
@@ -215,7 +231,7 @@ async def examples(request: Request):
             criteria=body.get("criteria"),
         )
         return {"examples": idea.get("examples") or [], "idea": idea}
-    except (ValueError, PermissionError) as exc:
+    except CATCH as exc:
         return fail(exc)
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=502)

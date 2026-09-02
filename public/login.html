@@ -30,12 +30,19 @@
             <label>نام تیم</label>
             <input id="team" placeholder="برای ادمین اختیاری">
             <div class="err" id="err"></div>
+            <div class="err" id="storeWarn"></div>
             <button class="primary" type="submit">ورود</button>
         </form>
     </div>
     <script src="workshop.js"></script>
     <script>
         if (Workshop.token()) location.href = 'index.html';
+        fetch('/api/health').then(r => r.json()).then(h => {
+            if (h && h.live === false) {
+                document.getElementById('storeWarn').textContent =
+                    'این استقرار Redis ندارد؛ کارگاه زنده بین دانش‌آموزان همگام نمی‌شود. در Vercel یک Redis (Upstash) بسازید و به پروژه وصل کنید.';
+            }
+        }).catch(() => {});
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const err = document.getElementById('err');

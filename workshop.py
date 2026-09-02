@@ -9,6 +9,8 @@ import time
 from copy import deepcopy
 from pathlib import Path
 
+import requests
+
 from llm_core import evaluate_criteria, generate_examples, normalize_criteria
 
 ROOT = Path(__file__).resolve().parent
@@ -35,6 +37,8 @@ if os.environ.get("VERCEL"):
 else:
     DATA_DIR = ROOT / "data"
 DATA_PATH = DATA_DIR / "workshop.json"
+STORE_KEY = "kargah:workshop"
+LOCK_KEY = "kargah:workshop:lock"
 
 MAX_STUDENTS = 100
 SESSION_TTL = 60 * 60 * 16
@@ -43,7 +47,83 @@ CRITERIA_KEYS = ["AAW", "CWC", "UNAN", "MONO", "IIA"]
 POINTS_PER_CRITERION = 10
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{2,32}$")
 
-_lock = threading.Lock()
+_thread_lock = threading.Lock()
+
+
+def _redis_creds():
+    url = (
+        os.environ.get("UPSTASH_REDIS_REST_URL")
+        or os.environ.get("KV_REST_API_URL")
+        or os.environ.get("REDIS_REST_URL")
+        or ""
+    ).rstrip("/")
+    token = (
+        os.environ.get("UPSTASH_REDIS_REST_TOKEN")
+        or os.environ.get("KV_REST_API_TOKEN")
+        or os.environ.get("REDIS_REST_TOKEN")
+        or ""
+    )
+    if url and token:
+        return url, token
+    return "", ""
+
+
+def uses_redis() -> bool:
+    url, token = _redis_creds()
+    return bool(url and token)
+
+
+def store_kind() -> str:
+    return "redis" if uses_redis() else "file"
+
+
+def live_classroom_ok() -> bool:
+    return uses_redis() or not os.environ.get("VERCEL")
+
+
+def _redis_call(*cmd):
+    url, token = _redis_creds()
+    response = requests.post(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        json=list(cmd),
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise RuntimeError(payload["error"])
+    return payload.get("result")
+
+
+class _StoreLock:
+    def __enter__(self):
+        _thread_lock.acquire()
+        self._redis = uses_redis()
+        self._token = ""
+        if self._redis:
+            self._token = secrets.token_hex(8)
+            for _ in range(40):
+                ok = _redis_call("SET", LOCK_KEY, self._token, "NX", "EX", 8)
+                if ok:
+                    break
+                time.sleep(0.05)
+            else:
+                _thread_lock.release()
+                raise RuntimeError("Classroom store is busy. Retry.")
+        return self
+
+    def __exit__(self, *args):
+        try:
+            if self._redis and self._token:
+                current = _redis_call("GET", LOCK_KEY)
+                if current == self._token:
+                    _redis_call("DEL", LOCK_KEY)
+        finally:
+            _thread_lock.release()
+
+
+_lock = _StoreLock()
 
 ARROWS_ORDERS = {
     0: ["BAC", "BAC", "BCA", "BAC", "CAB", "ACB", "ACB", "CAB", "ACB"],
@@ -98,17 +178,7 @@ def _blank() -> dict:
     }
 
 
-def _load() -> dict:
-    if not DATA_PATH.is_file():
-        data = _blank()
-        _dump(data)
-        return data
-    try:
-        data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        data = _blank()
-        _dump(data)
-        return data
+def _normalize(data: dict) -> dict:
     data.setdefault("version", 1)
     data.setdefault("unlocked", ["vote"])
     data.setdefault("vote_revealed", False)
@@ -124,7 +194,38 @@ def _load() -> dict:
     return data
 
 
+def _load() -> dict:
+    if uses_redis():
+        raw = _redis_call("GET", STORE_KEY)
+        if not raw:
+            data = _blank()
+            _dump(data)
+            return data
+        try:
+            data = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            data = _blank()
+            _dump(data)
+            return data
+        return _normalize(data)
+    if not DATA_PATH.is_file():
+        data = _blank()
+        _dump(data)
+        return data
+    try:
+        data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        data = _blank()
+        _dump(data)
+        return data
+    return _normalize(data)
+
+
 def _dump(data: dict) -> None:
+    payload = json.dumps(data, ensure_ascii=False)
+    if uses_redis():
+        _redis_call("SET", STORE_KEY, payload)
+        return
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     tmp = DATA_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -471,4 +572,6 @@ def snapshot(user: dict) -> dict:
             "votes": votes,
             "ideas": deepcopy(data.get("ideas") or []),
             "arrows": deepcopy(data.get("arrows") or default_arrows()),
+            "store": store_kind(),
+            "live": live_classroom_ok(),
         }

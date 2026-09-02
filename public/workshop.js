@@ -61,7 +61,7 @@
                 } catch (e) { /* keep polling */ }
             }
             tick();
-            timer = setInterval(tick, ms || 1200);
+            timer = setInterval(tick, ms || 2000);
             return () => clearInterval(timer);
         }
     };
