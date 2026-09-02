@@ -621,7 +621,7 @@ button:disabled, .tab-btn.locked, .sub-tab-btn.locked {
 }
 .admin-panel {
     margin: 0 0 14px;
-    padding: 14px 16px;
+    padding: 10px 12px;
 }
 .admin-panel form, .admin-create {
     display: flex;
@@ -630,7 +630,23 @@ button:disabled, .tab-btn.locked, .sub-tab-btn.locked {
     align-items: center;
 }
 .admin-create input { min-width: 140px; }
-.points-board { margin-top: 8px; }
+.fold + .fold { margin-top: 8px; }
+.fold-toggle {
+    width: 100%;
+    justify-content: space-between;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.1);
+    color: var(--c-text);
+    font-weight: 800;
+    padding: 10px 14px;
+}
+.fold-toggle .fold-caret {
+    color: var(--c-muted);
+    transition: transform .2s;
+}
+.fold-toggle.open .fold-caret { transform: rotate(90deg); }
+.fold-body { margin-top: 10px; }
+.points-board { margin-top: 0; }
 .points-row {
     display: flex;
     align-items: center;

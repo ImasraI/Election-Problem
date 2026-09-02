@@ -98,40 +98,53 @@
         </div>
 
         <div class="card admin-panel hidden" id="adminPanel">
-            <div class="card-header"><span id="adminPanelTitle">حساب‌ها</span></div>
-            <div class="admin-create hidden" id="ownerCreate">
-                <input id="newAdmin" placeholder="نام کاربری Mentor">
-                <input id="newAdminPass" placeholder="رمز Mentor" type="password">
-                <button class="primary" id="createAdminBtn" type="button">ساخت Mentor</button>
+            <div class="fold">
+                <button class="fold-toggle" id="toggleAccounts" type="button" aria-expanded="false">
+                    <span id="adminPanelTitle">حساب‌ها</span>
+                    <span class="fold-caret">▸</span>
+                </button>
+                <div class="fold-body hidden" id="accountsBody">
+                    <div class="admin-create hidden" id="ownerCreate">
+                        <input id="newAdmin" placeholder="نام کاربری Mentor">
+                        <input id="newAdminPass" placeholder="رمز Mentor" type="password">
+                        <button class="primary" id="createAdminBtn" type="button">ساخت Mentor</button>
+                    </div>
+                    <div class="admin-create" style="margin-top:8px;">
+                        <input id="newUser" placeholder="نام کاربری Voter">
+                        <input id="newPass" placeholder="رمز عبور" type="password">
+                        <button class="primary" id="createUserBtn" type="button">ساخت Voter</button>
+                        <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی پنل‌ها</button>
+                    </div>
+                    <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
+                    <table class="user-table" id="userTable"></table>
+                </div>
             </div>
-            <div class="admin-create" style="margin-top:8px;">
-                <input id="newUser" placeholder="نام کاربری Voter">
-                <input id="newPass" placeholder="رمز عبور" type="password">
-                <button class="primary" id="createUserBtn" type="button">ساخت Voter</button>
-                <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی پنل‌ها</button>
+            <div class="fold">
+                <button class="fold-toggle" id="togglePoints" type="button" aria-expanded="false">
+                    <span>تابلوی امتیازها</span>
+                    <span class="fold-caret">▸</span>
+                </button>
+                <div class="fold-body hidden points-board" id="pointsBoard"></div>
             </div>
-            <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
-            <table class="user-table" id="userTable"></table>
-            <div class="points-board hidden" id="pointsBoard"></div>
         </div>
 
         <div class="tab-bar" id="tabBar"></div>
         <div class="sub-tab-bar hidden" id="subTabBar"></div>
 
         <div class="iframe-container">
-            <iframe id="stateFrame" src="vote.html" title="استیت جاری"></iframe>
+            <iframe id="stateFrame" src="home.html" title="استیت جاری"></iframe>
         </div>
     </div>
 
     <script src="workshop.js"></script>
     <script>
         const GROUPS = [
-            { id: 'vote', label: 'رأی‌گیری', file: 'vote.html' },
-            { id: 's1', label: 'استیت ۱', file: 'state1.html' },
-            { id: 's2', label: 'استیت ۲', file: 'state2.html' },
-            { id: 's3', label: 'استیت ۳', file: 'state3.html' },
+            { id: 'vote', label: 'Voting', file: 'vote.html' },
+            { id: 's1', label: 'State 1', file: 'state1.html' },
+            { id: 's2', label: 'State 2', file: 'state2.html' },
+            { id: 's3', label: 'State 3', file: 'state3.html' },
             {
-                id: 's4', label: 'استیت ۴',
+                id: 's4', label: 'State 4',
                 children: [
                     { id: 's4-1', label: '۴.۱ همیشه برنده', file: 'state4-1.html' },
                     { id: 's4-2', label: '۴.۲ معیار کندورسه', file: 'state4-2.html' },
@@ -140,9 +153,9 @@
                     { id: 's4-5', label: '۴.۵ استقلال', file: 'state4-5.html' }
                 ]
             },
-            { id: 's5', label: 'استیت ۵', file: 'state5.html' },
+            { id: 's5', label: 'State 5', file: 'state5.html' },
             {
-                id: 's6', label: 'استیت ۶',
+                id: 's6', label: 'State 6',
                 children: [
                     { id: 's6-1', label: 'کندورسه', file: 'state6-1.html' },
                     { id: 's6-2', label: 'اکثریت', file: 'state6-2.html' },
@@ -153,10 +166,10 @@
                 ]
             },
             { id: 's8', label: 'Glimpse of Impossibility', file: 'glimpse.html' },
-            { id: 's7', label: 'اثبات ارو', file: 'Arrows_therom.html' }
+            { id: 's7', label: "َArrow's theorem", file: 'Arrows_therom.html' }
         ];
 
-        const NAMED_WHEN_LOCKED = new Set(['vote']);
+        const NAMED_WHEN_LOCKED = new Set();
         const leaves = [];
         GROUPS.forEach(g => {
             if (g.children) g.children.forEach(c => leaves.push({ ...c, group: g.id }));
@@ -166,7 +179,8 @@
         const tabBar = document.getElementById('tabBar');
         const subTabBar = document.getElementById('subTabBar');
         const iframe = document.getElementById('stateFrame');
-        let current = 0;
+        let current = -1;
+        let currentGroup = null;
         let me = null;
         let unlocked = ['vote'];
 
@@ -210,6 +224,10 @@
             document.getElementById('logoutBtn').addEventListener('click', () => Workshop.logout());
             document.getElementById('adminPanel').classList.toggle('hidden', !isStaff());
             document.getElementById('ownerCreate').classList.toggle('hidden', !isOwner());
+            const resetBtn = document.getElementById('resetWorkshopBtn');
+            if (resetBtn) {
+                resetBtn.textContent = isOwner() ? 'بازنشانی پنل‌های همه کلاس‌ها' : 'بازنشانی پنل‌ها';
+            }
             const title = document.getElementById('adminPanelTitle');
             title.innerHTML = isOwner()
                 ? '<span dir="ltr">Admin: Mentors and Voters</span>'
@@ -244,10 +262,9 @@
                 const ranked = users.slice().sort((a, b) => (b.points || 0) - (a.points || 0) || String(a.username).localeCompare(String(b.username)));
                 const total = ranked.reduce((sum, u) => sum + (u.points || 0), 0);
                 const board = document.getElementById('pointsBoard');
-                board.classList.remove('hidden');
                 board.innerHTML = `
-                    <div class="card-header" style="margin-top:12px;">
-                        <span>تابلوی امتیازها</span>
+                    <div class="card-header">
+                        <span>رتبه‌بندی</span>
                         <span class="badge">${total} مجموع</span>
                     </div>
                     ${ranked.map((u, i) => `
@@ -265,14 +282,15 @@
         }
 
         function renderChrome() {
-            const leaf = leaves[current];
+            const leaf = current >= 0 ? leaves[current] : null;
+            const activeGroup = leaf ? leaf.group : currentGroup;
             tabBar.innerHTML = GROUPS.map(g => {
                 const open = groupUnlocked(g);
                 const locked = !isStaff() && !open;
                 const label = studentLabel(g);
                 const cls = [
                     'tab-btn',
-                    g.id === leaf.group ? 'active' : '',
+                    g.id === activeGroup ? 'active' : '',
                     locked ? 'locked' : '',
                     isStaff() && !open ? 'staff-hidden' : ''
                 ].join(' ');
@@ -280,11 +298,11 @@
             }).join('') + `
                 <div class="tab-nav">
                     <button id="prevTab" type="button">◀</button>
-                    <span class="tab-indicator">${current + 1} / ${leaves.length}</span>
+                    <span class="tab-indicator">${current >= 0 ? current + 1 : '—'} / ${leaves.length}</span>
                     <button id="nextTab" type="button">▶</button>
                 </div>`;
-            const group = GROUPS.find(g => g.id === leaf.group);
-            if (group.children) {
+            const group = GROUPS.find(g => g.id === activeGroup);
+            if (group && group.children) {
                 subTabBar.classList.remove('hidden');
                 subTabBar.innerHTML = group.children.map(c => {
                     const open = isUnlocked(c.id);
@@ -292,7 +310,7 @@
                     const label = isStaff() || open ? c.label : '';
                     const cls = [
                         'sub-tab-btn',
-                        c.id === leaf.id ? 'active' : '',
+                        leaf && c.id === leaf.id ? 'active' : '',
                         locked ? 'locked' : '',
                         isStaff() && !open ? 'staff-hidden' : ''
                     ].join(' ');
@@ -322,10 +340,12 @@
         async function hidePanel(id) {
             try {
                 const data = await Workshop.hide(id);
-                unlocked = data.unlocked || unlocked.filter(x => x !== id);
-                if (!isUnlocked(leaves[current].id) && !isStaff()) {
-                    const fallback = leaves.findIndex(l => isUnlocked(l.id));
-                    switchTo(fallback < 0 ? 0 : fallback);
+                unlocked = Array.isArray(data.unlocked) ? data.unlocked.filter(x => x !== id) : unlocked.filter(x => x !== id);
+                const leaf = current >= 0 ? leaves[current] : null;
+                const viewingHidden = !!(leaf && (leaf.id === id || leaf.group === id || !isUnlocked(leaf.id)));
+                const viewingGroupHidden = current < 0 && currentGroup === id;
+                if (viewingHidden || viewingGroupHidden || !(unlocked || []).length) {
+                    showHome();
                 } else {
                     renderChrome();
                 }
@@ -336,8 +356,24 @@
 
         async function onGroupClick(id) {
             const g = GROUPS.find(x => x.id === id);
-            const target = firstOpenLeaf(g);
-            await onLeafClick(target);
+            if (!g) return;
+            if (g.children) {
+                if (!isStaff() && !groupUnlocked(g)) return;
+                if (isStaff()) {
+                    try {
+                        const data = await Workshop.unlock(g.id);
+                        if (data.unlocked) unlocked = data.unlocked;
+                    } catch (e) { /* still open the group home */ }
+                }
+                current = -1;
+                currentGroup = g.id;
+                iframe.src = 'home.html';
+                iframe.style.height = '700px';
+                updateAppLogo();
+                renderChrome();
+                return;
+            }
+            await onLeafClick(g.id);
         }
 
         async function onLeafClick(id) {
@@ -354,7 +390,15 @@
         }
 
         function step(dir) {
-            let idx = current + dir;
+            let idx;
+            if (current >= 0) {
+                idx = current + dir;
+            } else if (currentGroup) {
+                const start = leaves.findIndex(l => l.group === currentGroup);
+                idx = dir > 0 ? start : start - 1;
+            } else {
+                idx = dir > 0 ? 0 : -1;
+            }
             while (idx >= 0 && idx < leaves.length) {
                 if (isStaff() || isUnlocked(leaves[idx].id)) {
                     onLeafClick(leaves[idx].id);
@@ -366,13 +410,17 @@
 
         function stateLogoSrc(leaf) {
             if (!leaf) return '';
-            const match = String(leaf.group || '').match(/^s(\d+)$/);
-            return match ? ('state' + match[1] + '.png') : '';
+            const id = String(leaf.id || '');
+            const sub = id.match(/^s(\d+)-(\d+)$/);
+            if (sub) return 'state' + sub[1] + '.' + sub[2] + '.png';
+            const top = id.match(/^s(\d+)$/) || String(leaf.group || '').match(/^s(\d+)$/);
+            return top ? ('state' + top[1] + '.png') : '';
         }
 
         function updateAppLogo() {
             const img = document.getElementById('appLogo');
-            const src = stateLogoSrc(leaves[current]);
+            const leaf = current >= 0 ? leaves[current] : null;
+            const src = stateLogoSrc(leaf);
             if (!src) {
                 img.hidden = true;
                 img.removeAttribute('src');
@@ -388,14 +436,27 @@
                 img.hidden = false;
                 return;
             }
+            const sub = leaf ? String(leaf.id || '').match(/^s(\d+)-(\d+)$/) : null;
             img.hidden = true;
-            img.alt = 'لوگوی استیت ' + (String(leaves[current].group || '').replace(/^s/, '') || '');
+            img.alt = sub
+                ? ('لوگوی استیت ' + sub[1] + '.' + sub[2])
+                : ('لوگوی استیت ' + (String(leaf.group || '').replace(/^s/, '') || ''));
             img.src = src;
+        }
+
+        function showHome() {
+            current = -1;
+            currentGroup = null;
+            iframe.src = 'home.html';
+            iframe.style.height = '700px';
+            updateAppLogo();
+            renderChrome();
         }
 
         function switchTo(index) {
             if (index < 0 || index >= leaves.length) return;
             current = index;
+            currentGroup = leaves[index].group;
             iframe.src = leaves[index].file;
             updateAppLogo();
             renderChrome();
@@ -441,27 +502,44 @@
             }
         });
         document.getElementById('resetWorkshopBtn').addEventListener('click', async () => {
-            if (!confirm('همه پنل‌های بازشده مخفی شوند؟ حساب‌های کاربری پاک نمی‌شوند.')) return;
+            const all = isOwner();
+            const msg = all
+                ? 'پنل‌های بازشده برای همه کلاس‌ها مخفی شوند؟ حساب‌های کاربری پاک نمی‌شوند.'
+                : 'پنل‌های بازشده کلاس شما مخفی شوند؟ حساب‌های کاربری پاک نمی‌شوند.';
+            if (!confirm(msg)) return;
             await Workshop.request('POST', '/api/admin/reset', {});
             unlocked = ['vote'];
-            switchTo(0);
-            document.getElementById('adminStatus').textContent = 'پنل‌ها بازنشانی شدند.';
+            showHome();
+            document.getElementById('adminStatus').textContent = all
+                ? 'پنل‌های همه کلاس‌ها بازنشانی شدند.'
+                : 'پنل‌های کلاس شما بازنشانی شدند.';
             refreshUsers();
         });
 
         Workshop.startPolling((data, changed) => {
             me = data.me;
-            unlocked = data.unlocked || ['vote'];
+            unlocked = Array.isArray(data.unlocked) ? data.unlocked : [];
             if (!changed) return;
             renderUser();
             if (isStaff()) refreshUsers();
-            if (!isStaff() && leaves[current] && !isUnlocked(leaves[current].id)) {
-                const fallback = leaves.findIndex(l => isUnlocked(l.id));
-                switchTo(fallback < 0 ? 0 : fallback);
+            if (current >= 0 && !isStaff() && leaves[current] && !isUnlocked(leaves[current].id)) {
+                showHome();
             } else {
                 renderChrome();
             }
         });
+
+        function bindFold(btnId, bodyId) {
+            const btn = document.getElementById(btnId);
+            const body = document.getElementById(bodyId);
+            btn.addEventListener('click', () => {
+                const closed = body.classList.toggle('hidden');
+                btn.classList.toggle('open', !closed);
+                btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+            });
+        }
+        bindFold('toggleAccounts', 'accountsBody');
+        bindFold('togglePoints', 'pointsBoard');
     </script>
 </body>
 </html>

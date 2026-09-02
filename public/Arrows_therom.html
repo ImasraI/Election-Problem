@@ -82,35 +82,6 @@
             box-shadow: 0 0 16px rgba(57, 211, 255, .5);
         }
 
-        .arrows-mascots {
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
-            gap: clamp(12px, 4vw, 36px);
-            flex-wrap: wrap;
-            margin: 4px auto 10px;
-        }
-
-        .arrows-mascot {
-            display: block;
-            width: min(240px, 46vw);
-            height: auto;
-            pointer-events: none;
-            user-select: none;
-        }
-
-        .arrows-mascot.blend-white {
-            mix-blend-mode: normal;
-            filter: none;
-            border-radius: 18px;
-            box-shadow: 0 18px 36px rgba(0, 0, 0, .45);
-        }
-
-        .arrows-mascot.blend-black {
-            mix-blend-mode: screen;
-            filter: drop-shadow(0 18px 36px rgba(0, 0, 0, .45));
-        }
-
         .subtitle {
             color: var(--muted);
             font-size: 14px;
@@ -669,10 +640,6 @@
 <body>
     <div class="container">
         <header>
-            <div class="arrows-mascots">
-                <img class="arrows-mascot blend-white" src="arrows-mascot.jpg" alt="Arrow's Theorem" width="240" height="240">
-                <img class="arrows-mascot blend-black" src="arrows-mascot-2.png" alt="" width="240" height="240">
-            </div>
             <div class="kicker" style="text-align:center">ناممکن‌بودن انتخاب اجتماعی</div>
             <h1 style="text-align:center">Arrow's Theorem</h1>
             <p class="subtitle" style="text-align:center;max-width:640px;margin:0 auto">

@@ -206,6 +206,7 @@ def _blank() -> dict:
     return {
         "version": 1,
         "unlocked": ["vote"],
+        "hidden": [],
         "vote_revealed": False,
         "vote_display": [],
         "votes": {},
@@ -233,6 +234,7 @@ def _blank() -> dict:
 def _normalize(data: dict) -> dict:
     data.setdefault("version", 1)
     data.setdefault("unlocked", ["vote"])
+    data.setdefault("hidden", [])
     data.setdefault("vote_revealed", False)
     data.setdefault("vote_display", [])
     data.setdefault("votes", {})
@@ -265,8 +267,6 @@ def _normalize(data: dict) -> dict:
     shown = set(data.get("unlocked") or [])
     if "s6-6" not in shown and {"s6-1", "s6-2", "s6-3", "s6-4", "s6-5"} <= shown:
         data["unlocked"] = list(data["unlocked"]) + ["s6-6"]
-    if "vote" not in data["unlocked"]:
-        data["unlocked"] = ["vote"] + list(data["unlocked"])
     return data
 
 
@@ -466,7 +466,7 @@ def create_student(actor: dict, username: str, password: str) -> dict:
             "used_state5": False,
             "used_state1": False,
             "sponsor": actor["username"],
-            "unlocked": ["vote"],
+            "unlocked": _id_list(data.get("unlocked")),
         }
         _bump(data)
         _dump(data)
@@ -562,15 +562,23 @@ def _related_ids(panel_id: str, hiding: bool = False) -> list:
     return list(dict.fromkeys(ids))
 
 
+def _id_list(val) -> list:
+    if val is None:
+        return []
+    return list(val)
+
+
 def _effective_unlocked(data: dict, user: dict) -> list:
-    shown = set(data.get("unlocked") or ["vote"]) | set(user.get("unlocked") or ["vote"])
-    shown -= set(user.get("hidden") or [])
+    shown = set(_id_list(data.get("unlocked"))) | set(_id_list((user or {}).get("unlocked")))
+    shown -= set(_id_list(data.get("hidden")))
+    shown -= set(_id_list((user or {}).get("hidden")))
     return sorted(shown)
 
 
 def _audience_unlocked(data: dict, actor: dict) -> list:
+    blocked = set(_id_list(data.get("hidden")))
     if is_owner(actor):
-        return list(data.get("unlocked") or ["vote"])
+        return sorted(set(_id_list(data.get("unlocked"))) - blocked)
     if is_admin(actor):
         shown = set()
         found = False
@@ -579,13 +587,15 @@ def _audience_unlocked(data: dict, actor: dict) -> list:
                 found = True
                 shown.update(_effective_unlocked(data, user))
         if not found:
-            shown.update(data.get("unlocked") or ["vote"])
+            shown.update(_id_list(data.get("unlocked")))
+        shown -= blocked
+        shown -= set(_id_list(actor.get("hidden")))
         return sorted(shown)
     return _effective_unlocked(data, actor)
 
 
 def _grant_user(user: dict, ids) -> None:
-    unlocked = list(user.get("unlocked") or ["vote"])
+    unlocked = _id_list(user.get("unlocked"))
     hidden = list(user.get("hidden") or [])
     for item in ids:
         if item not in unlocked:
@@ -598,7 +608,7 @@ def _grant_user(user: dict, ids) -> None:
 
 def _revoke_user(user: dict, ids) -> None:
     drop = set(ids)
-    user["unlocked"] = [item for item in (user.get("unlocked") or ["vote"]) if item not in drop]
+    user["unlocked"] = [item for item in _id_list(user.get("unlocked")) if item not in drop]
     hidden = list(user.get("hidden") or [])
     for item in ids:
         if item not in hidden:
@@ -615,22 +625,25 @@ def unlock_panel(actor: dict, panel_id: str) -> list:
     extras = _related_ids(panel_id, hiding=False)
     with _lock:
         data = _load()
+        stored = data["users"].get(actor["username"]) or actor
         if is_owner(actor):
-            unlocked = list(data.get("unlocked") or [])
+            unlocked = _id_list(data.get("unlocked"))
             for item in extras:
                 if item not in unlocked:
                     unlocked.append(item)
             data["unlocked"] = unlocked
+            data["hidden"] = [item for item in _id_list(data.get("hidden")) if item not in extras]
             for user in data["users"].values():
                 if user.get("role") == "student":
                     _grant_user(user, extras)
         else:
+            _grant_user(stored, extras)
             for user in data["users"].values():
                 if user.get("role") == "student" and user.get("sponsor") == actor["username"]:
                     _grant_user(user, extras)
         _bump(data)
         _dump(data)
-        return _audience_unlocked(data, actor)
+        return _audience_unlocked(data, stored)
 
 
 def hide_panel(actor: dict, panel_id: str) -> list:
@@ -642,18 +655,24 @@ def hide_panel(actor: dict, panel_id: str) -> list:
     extras = _related_ids(panel_id, hiding=True)
     with _lock:
         data = _load()
+        stored = data["users"].get(actor["username"]) or actor
         if is_owner(actor):
-            data["unlocked"] = [item for item in (data.get("unlocked") or []) if item not in extras]
+            data["unlocked"] = [item for item in _id_list(data.get("unlocked")) if item not in extras]
+            data["hidden"] = _id_list(data.get("hidden"))
+            for item in extras:
+                if item not in data["hidden"]:
+                    data["hidden"].append(item)
             for user in data["users"].values():
                 if user.get("role") == "student":
                     _revoke_user(user, extras)
         else:
+            _revoke_user(stored, extras)
             for user in data["users"].values():
                 if user.get("role") == "student" and user.get("sponsor") == actor["username"]:
                     _revoke_user(user, extras)
         _bump(data)
         _dump(data)
-        return _audience_unlocked(data, actor)
+        return _audience_unlocked(data, stored)
 
 
 def set_vote(user: dict, rank: str) -> dict:
@@ -1008,16 +1027,23 @@ def reset_workshop(actor: dict) -> None:
         raise PermissionError("فقط Mentor یا Admin.")
     with _lock:
         data = _load()
-        if is_owner(actor):
+        reset_all = is_owner(actor) or actor.get("username") == "admin"
+        if reset_all:
             data["unlocked"] = ["vote"]
+            data["hidden"] = []
             data["vote_revealed"] = False
             data["vote_display"] = []
             for user in data["users"].values():
                 if user.get("role") == "student":
                     user["unlocked"] = ["vote"]
                     user["hidden"] = []
+                elif user.get("role") == "admin":
+                    user["hidden"] = []
         else:
             mine = actor["username"]
+            stored = data["users"].get(mine)
+            if stored:
+                stored["hidden"] = []
             for user in data["users"].values():
                 if user.get("role") == "student" and user.get("sponsor") == mine:
                     user["unlocked"] = ["vote"]
