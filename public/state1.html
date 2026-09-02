@@ -69,7 +69,7 @@
             try {
                 await Workshop.request('POST', '/api/state1', { text: t });
                 input.value = '';
-                statusEl.textContent = 'ایده ثبت شد و برای همه دیده می‌شود.';
+                statusEl.textContent = 'ایده ثبت شد و برای کلاس شما دیده می‌شود.';
                 if (me) me.used_state1 = true;
             } catch (err) {
                 statusEl.textContent = err.message || String(err);

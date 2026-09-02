@@ -10,7 +10,7 @@
     <div class="container">
         <h2>رأی‌گیری</h2>
         <div class="card">
-            <p class="text-muted">سه نامزد A، B و C را به ترتیب ترجیح خود بچینید. تا وقتی ادمین نتیجه را نشان ندهد می‌توانید رأی را عوض کنید.</p>
+            <p class="text-muted">سه نامزد A، B و C را به ترتیب ترجیح خود بچینید. تا وقتی Admin یا Mentor نتیجه را نشان ندهد می‌توانید رأی را عوض کنید.</p>
             <div id="rankBox" style="margin-top:12px;"></div>
             <div class="row" style="margin-top:12px;">
                 <button class="primary" id="submitBtn" type="button">ثبت رأی</button>
@@ -37,6 +37,9 @@
         let revealed = false;
         let appliedMine = false;
 
+        // Later, set this to lock a specific shown result. Leave null for a random canned result.
+        const FIXED_RESULT = null;
+
         function isStaff(user) { return user && (user.role === 'owner' || user.role === 'admin'); }
 
         function applyVote(vote) {
@@ -44,10 +47,18 @@
             widget.setOrder(M.parseRanking(vote.rank));
         }
 
+        function resultVotes(votes) {
+            if (FIXED_RESULT && Array.isArray(FIXED_RESULT.votes) && FIXED_RESULT.votes.length) {
+                return FIXED_RESULT.votes;
+            }
+            return votes || [];
+        }
+
         function showResults(votes) {
+            const shown = resultVotes(votes);
             resultsCard.classList.remove('hidden');
-            document.getElementById('voteCount').textContent = (votes || []).length + ' رأی';
-            const ranks = (votes || []).map(v => v.rank);
+            document.getElementById('voteCount').textContent = shown.length + ' رأی';
+            const ranks = shown.map(v => v.rank);
             const cands = ['A', 'B', 'C'];
             const plur = M.plurality(ranks, cands);
             M.renderScoreBars(document.getElementById('scoreBars'), plur.counts, cands);
@@ -58,7 +69,7 @@
                 <p>برنده بوردا: <strong>${borda.winner || '—'}</strong></p>
                 <p>برنده کندورسه: <strong>${counts ? (M.hasCondorcet(counts, cands) || 'ندارد') : '—'}</strong></p>
                 <div class="voter-list" style="margin-top:12px;">
-                    ${(votes || []).map(v => `<div class="voter-item"><span class="rank">${M.escapeHtml(v.name)} · ${M.escapeHtml(v.team)} — ${M.formatRank(v.rank)}</span></div>`).join('') || '<div class="empty-state">رأیی نیست.</div>'}
+                    ${shown.map(v => `<div class="voter-item"><span class="rank">${M.escapeHtml(v.name)} · ${M.escapeHtml(v.team)} — ${M.formatRank(v.rank)}</span></div>`).join('') || '<div class="empty-state">رأیی نیست.</div>'}
                 </div>`;
         }
 

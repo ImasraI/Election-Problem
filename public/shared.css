@@ -539,6 +539,40 @@ button:disabled, .tab-btn.locked, .sub-tab-btn.locked {
     cursor: pointer;
     color: transparent !important;
 }
+.tab-btn.staff-hidden, .sub-tab-btn.staff-hidden {
+    color: #7d8aa0 !important;
+    opacity: .62;
+    cursor: pointer;
+    pointer-events: auto;
+    min-width: auto;
+    background: rgba(255,255,255,.02);
+    border-color: rgba(255,255,255,.06);
+}
+.tab-btn.staff-hidden.active, .sub-tab-btn.staff-hidden.active {
+    background: rgba(139, 155, 180, .22);
+    color: #b7c2d4 !important;
+    border-color: rgba(139, 155, 180, .35);
+    box-shadow: none;
+}
+.tab-wrap, .sub-tab-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.hide-tab {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 8px;
+    color: var(--c-muted);
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.12);
+    cursor: pointer;
+}
+.hide-tab:hover {
+    color: var(--c-rose);
+    border-color: rgba(255, 93, 125, .4);
+}
 .user-chip {
     margin-right: auto;
     display: flex;

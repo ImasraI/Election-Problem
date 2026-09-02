@@ -46,6 +46,7 @@
         },
         async sync() { return request('GET', '/api/sync'); },
         async unlock(id) { return request('POST', '/api/unlock', { id }); },
+        async hide(id) { return request('POST', '/api/hide', { id }); },
         startPolling(onData, ms) {
             let version = -1;
             let timer = null;

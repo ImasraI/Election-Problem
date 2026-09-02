@@ -98,7 +98,7 @@
                 });
             });
             const idea = selected >= 0 ? ideas[selected] : null;
-            const canEx = hasFailed(idea) && me && (me.role === 'admin' || idea.username === me.username);
+            const canEx = hasFailed(idea) && me && (me.role === 'admin' || me.role === 'owner' || idea.username === me.username);
             examplesBtn.disabled = !canEx;
         }
 

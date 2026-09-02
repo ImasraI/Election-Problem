@@ -110,6 +110,19 @@ async def unlock(request: Request):
         return fail(exc)
 
 
+@app.post("/api/hide")
+async def hide(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        unlocked = workshop.hide_panel(user, body.get("id") or "")
+        return {"unlocked": unlocked}
+    except CATCH as exc:
+        return fail(exc)
+
+
 @app.post("/api/admin/users")
 async def admin_create_user(request: Request):
     user, err = require_user(request)

@@ -19,16 +19,16 @@
 <body>
     <div class="card login-card">
         <h1>ورود به کارگاه</h1>
-        <p>حساب را ادمین می‌سازد. دانش‌آموزان ثبت‌نام نمی‌کنند؛ نام و تیم را همین‌جا وارد کنید.</p>
+        <p>حساب را Admin یا Mentor می‌سازد. Voterها ثبت‌نام نمی‌کنند؛ نام و تیم را همین‌جا وارد کنید.</p>
         <form id="loginForm">
             <label>نام کاربری</label>
             <input id="username" autocomplete="username" required>
             <label>رمز عبور</label>
             <input id="password" type="password" autocomplete="current-password" required>
-            <label>نام دانش‌آموز</label>
-            <input id="name" autocomplete="name" placeholder="برای ادمین اختیاری">
+            <label>نام Voter</label>
+            <input id="name" autocomplete="name" placeholder="برای Admin و Mentor اختیاری">
             <label>نام تیم</label>
-            <input id="team" placeholder="برای ادمین اختیاری">
+            <input id="team" placeholder="برای Admin و Mentor اختیاری">
             <div class="err" id="err"></div>
             <div class="err" id="storeWarn"></div>
             <button class="primary" type="submit">ورود</button>
@@ -40,7 +40,7 @@
         fetch('/api/health').then(r => r.json()).then(h => {
             if (h && h.live === false) {
                 document.getElementById('storeWarn').textContent =
-                    'این استقرار Redis ندارد؛ کارگاه زنده بین دانش‌آموزان همگام نمی‌شود. در Vercel یک Redis (Upstash) بسازید و به پروژه وصل کنید.';
+                    'این استقرار Redis ندارد؛ کارگاه زنده بین Voterها همگام نمی‌شود. در Vercel یک Redis (Upstash) بسازید و به پروژه وصل کنید.';
             }
         }).catch(() => {});
         document.getElementById('loginForm').addEventListener('submit', async (e) => {

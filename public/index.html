@@ -35,7 +35,7 @@
             background: rgba(255,255,255,.04);
             border: 1px solid rgba(255,255,255,.08);
             padding: 8px 16px; font-size: 14px; font-weight: 700;
-            color: var(--c-muted); border-radius: 12px; cursor: pointer;
+            color: var(--c-text); border-radius: 12px; cursor: pointer;
             transition: all .25s cubic-bezier(.4,0,.2,1);
         }
         .sub-tab-btn { padding: 6px 12px; font-size: 13px; border-radius: 10px; }
@@ -82,15 +82,15 @@
         <div class="card admin-panel hidden" id="adminPanel">
             <div class="card-header"><span id="adminPanelTitle">حساب‌ها</span></div>
             <div class="admin-create hidden" id="ownerCreate">
-                <input id="newAdmin" placeholder="نام کاربری ادمین">
-                <input id="newAdminPass" placeholder="رمز ادمین" type="password">
-                <button class="primary" id="createAdminBtn" type="button">ساخت ادمین</button>
+                <input id="newAdmin" placeholder="نام کاربری Mentor">
+                <input id="newAdminPass" placeholder="رمز Mentor" type="password">
+                <button class="primary" id="createAdminBtn" type="button">ساخت Mentor</button>
             </div>
             <div class="admin-create" style="margin-top:8px;">
-                <input id="newUser" placeholder="نام کاربری دانش‌آموز">
+                <input id="newUser" placeholder="نام کاربری Voter">
                 <input id="newPass" placeholder="رمز عبور" type="password">
-                <button class="primary" id="createUserBtn" type="button">ساخت دانش‌آموز</button>
-                <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی کارگاه</button>
+                <button class="primary" id="createUserBtn" type="button">ساخت Voter</button>
+                <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی پنل‌ها</button>
             </div>
             <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
             <table class="user-table" id="userTable"></table>
@@ -152,9 +152,9 @@
         function isStaff() { return me && (me.role === 'owner' || me.role === 'admin'); }
         function isOwner() { return me && me.role === 'owner'; }
         function roleLabel(role) {
-            if (role === 'owner') return 'مالک';
-            if (role === 'admin') return 'ادمین';
-            return 'دانش‌آموز';
+            if (role === 'owner') return 'Admin';
+            if (role === 'admin') return 'Mentor';
+            return 'Voter';
         }
         function isUnlocked(id) { return unlocked.indexOf(id) >= 0; }
         function groupUnlocked(g) {
@@ -166,12 +166,16 @@
             const open = g.children.find(c => isUnlocked(c.id));
             return open ? open.id : g.children[0].id;
         }
-        function studentLabel(item, parentLocked) {
+        function studentLabel(item) {
             if (isStaff()) return item.label;
             if (item.children) return groupUnlocked(item) ? item.label : '';
             if (NAMED_WHEN_LOCKED.has(item.id) || isUnlocked(item.id)) return item.label;
-            if (parentLocked) return '';
             return '';
+        }
+
+        function hideBtn(id, open) {
+            if (!isStaff() || !open) return '';
+            return `<button class="hide-tab" type="button" data-hide="${id}">مخفی</button>`;
         }
 
         function renderUser() {
@@ -185,9 +189,10 @@
             document.getElementById('logoutBtn').addEventListener('click', () => Workshop.logout());
             document.getElementById('adminPanel').classList.toggle('hidden', !isStaff());
             document.getElementById('ownerCreate').classList.toggle('hidden', !isOwner());
-            document.getElementById('adminPanelTitle').textContent = isOwner()
-                ? 'مالک: ادمین‌ها و دانش‌آموزان'
-                : 'ادمین: حداکثر ۶ دانش‌آموز خودتان';
+            const title = document.getElementById('adminPanelTitle');
+            title.innerHTML = isOwner()
+                ? '<span dir="ltr">Admin: Mentors and Voters</span>'
+                : '<span dir="ltr">Mentor:</span> حداکثر ۶ Voter خودتان';
         }
 
         async function refreshUsers() {
@@ -206,7 +211,7 @@
                         <td>${u.role === 'owner' ? '' : `<button class="remove-btn" data-del="${u.username}" type="button">حذف</button>`}</td>
                     </tr>`).join('');
                 document.getElementById('userTable').innerHTML = `
-                    <thead><tr><th>کاربری</th><th>نام</th><th>تیم</th><th>نقش</th><th>ادمین</th><th>امتیاز</th><th>استیت ۵</th><th></th></tr></thead>
+                    <thead><tr><th>کاربری</th><th>نام</th><th>تیم</th><th>نقش</th><th>Mentor</th><th>امتیاز</th><th>استیت ۵</th><th></th></tr></thead>
                     <tbody>${rows}</tbody>`;
                 document.querySelectorAll('[data-del]').forEach(btn => {
                     btn.addEventListener('click', async () => {
@@ -229,9 +234,9 @@
                     'tab-btn',
                     g.id === leaf.group ? 'active' : '',
                     locked ? 'locked' : '',
-                    isStaff() && !open ? 'admin-unlock' : ''
+                    isStaff() && !open ? 'staff-hidden' : ''
                 ].join(' ');
-                return `<button class="${cls}" data-group="${g.id}">${label || '&nbsp;'}</button>`;
+                return `<span class="tab-wrap"><button class="${cls}" data-group="${g.id}">${label || '&nbsp;'}</button>${hideBtn(g.id, open)}</span>`;
             }).join('') + `
                 <div class="tab-nav">
                     <button id="prevTab" type="button">◀</button>
@@ -249,9 +254,9 @@
                         'sub-tab-btn',
                         c.id === leaf.id ? 'active' : '',
                         locked ? 'locked' : '',
-                        isStaff() && !open ? 'admin-unlock' : ''
+                        isStaff() && !open ? 'staff-hidden' : ''
                     ].join(' ');
-                    return `<button class="${cls}" data-id="${c.id}">${label || '&nbsp;'}</button>`;
+                    return `<span class="sub-tab-wrap"><button class="${cls}" data-id="${c.id}">${label || '&nbsp;'}</button>${hideBtn(c.id, open)}</span>`;
                 }).join('');
             } else {
                 subTabBar.classList.add('hidden');
@@ -263,8 +268,30 @@
             subTabBar.querySelectorAll('[data-id]').forEach(btn => {
                 btn.addEventListener('click', () => onLeafClick(btn.dataset.id));
             });
+            document.querySelectorAll('[data-hide]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    hidePanel(btn.dataset.hide);
+                });
+            });
             document.getElementById('prevTab').addEventListener('click', () => step(-1));
             document.getElementById('nextTab').addEventListener('click', () => step(1));
+        }
+
+        async function hidePanel(id) {
+            try {
+                const data = await Workshop.hide(id);
+                unlocked = data.unlocked || unlocked.filter(x => x !== id);
+                if (!isUnlocked(leaves[current].id) && !isStaff()) {
+                    const fallback = leaves.findIndex(l => isUnlocked(l.id));
+                    switchTo(fallback < 0 ? 0 : fallback);
+                } else {
+                    renderChrome();
+                }
+            } catch (err) {
+                document.getElementById('adminStatus').textContent = err.message || String(err);
+            }
         }
 
         async function onGroupClick(id) {
@@ -278,7 +305,10 @@
             if (idx < 0) return;
             if (!isStaff() && !isUnlocked(id)) return;
             if (isStaff()) {
-                try { await Workshop.unlock(id); } catch (e) { /* still open the panel */ }
+                try {
+                    const data = await Workshop.unlock(id);
+                    if (data.unlocked) unlocked = data.unlocked;
+                } catch (e) { /* still open the panel */ }
             }
             switchTo(idx);
         }
@@ -318,7 +348,7 @@
                 });
                 document.getElementById('newAdmin').value = '';
                 document.getElementById('newAdminPass').value = '';
-                status.textContent = 'ادمین ساخته شد.';
+                status.textContent = 'Mentor ساخته شد.';
                 refreshUsers();
             } catch (err) {
                 status.textContent = err.message || String(err);
@@ -334,17 +364,18 @@
                 });
                 document.getElementById('newUser').value = '';
                 document.getElementById('newPass').value = '';
-                status.textContent = 'حساب ساخته شد.';
+                status.textContent = 'Voter ساخته شد.';
                 refreshUsers();
             } catch (err) {
                 status.textContent = err.message || String(err);
             }
         });
         document.getElementById('resetWorkshopBtn').addEventListener('click', async () => {
-            if (!confirm('رأی‌ها، امتیازها و پنل‌های بازشده پاک شوند؟')) return;
+            if (!confirm('همه پنل‌های بازشده مخفی شوند؟ حساب‌های کاربری پاک نمی‌شوند.')) return;
             await Workshop.request('POST', '/api/admin/reset', {});
             unlocked = ['vote'];
             switchTo(0);
+            document.getElementById('adminStatus').textContent = 'پنل‌ها بازنشانی شدند.';
             refreshUsers();
         });
 
