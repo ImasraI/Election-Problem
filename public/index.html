@@ -112,6 +112,7 @@
             </div>
             <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
             <table class="user-table" id="userTable"></table>
+            <div class="points-board hidden" id="pointsBoard"></div>
         </div>
 
         <div class="tab-bar" id="tabBar"></div>
@@ -147,10 +148,12 @@
                     { id: 's6-2', label: 'اکثریت', file: 'state6-2.html' },
                     { id: 's6-3', label: 'بوردا', file: 'state6-3.html' },
                     { id: 's6-4', label: 'حذف تدریجی', file: 'state6-4.html' },
-                    { id: 's6-5', label: 'زوجی ترتیبی', file: 'state6-5.html' }
+                    { id: 's6-5', label: 'زوجی ترتیبی', file: 'state6-5.html' },
+                    { id: 's6-6', label: 'جدول خلاصه', file: 'state6-6.html' }
                 ]
             },
-            { id: 's7', label: 'اثبات ارو', file: 'Arrows_therom.html' }
+            { id: 's7', label: 'اثبات ارو', file: 'Arrows_therom.html' },
+            { id: 's8', label: 'Glimpse of Impossibility', file: 'glimpse.html' }
         ];
 
         const NAMED_WHEN_LOCKED = new Set(['vote']);
@@ -217,7 +220,8 @@
             if (!isStaff()) return;
             try {
                 const data = await Workshop.request('GET', '/api/admin/users');
-                const rows = (data.users || []).map(u => `
+                const users = data.users || [];
+                const rows = users.map(u => `
                     <tr>
                         <td>${u.username}</td>
                         <td>${u.name || '—'}</td>
@@ -237,6 +241,24 @@
                         refreshUsers();
                     });
                 });
+                const ranked = users.slice().sort((a, b) => (b.points || 0) - (a.points || 0) || String(a.username).localeCompare(String(b.username)));
+                const total = ranked.reduce((sum, u) => sum + (u.points || 0), 0);
+                const board = document.getElementById('pointsBoard');
+                board.classList.remove('hidden');
+                board.innerHTML = `
+                    <div class="card-header" style="margin-top:12px;">
+                        <span>تابلوی امتیازها</span>
+                        <span class="badge">${total} مجموع</span>
+                    </div>
+                    ${ranked.map((u, i) => `
+                        <div class="points-row">
+                            <span class="points-place">${i + 1}</span>
+                            <div class="points-who">
+                                <strong>${u.name || u.username}</strong>
+                                <span class="text-muted">${roleLabel(u.role)}${u.team ? ' · ' + u.team : ''}</span>
+                            </div>
+                            <span class="points-val">${u.points || 0}</span>
+                        </div>`).join('') || '<div class="empty-state">هنوز امتیازی نیست.</div>'}`;
             } catch (err) {
                 document.getElementById('adminStatus').textContent = err.message || String(err);
             }

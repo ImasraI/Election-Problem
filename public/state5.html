@@ -53,7 +53,7 @@
         const examplesBtn = document.getElementById('examplesBtn');
         let ideas = [];
         let state1Ideas = [];
-        let selected = -1;
+        let selectedId = '';
         let me = null;
         let processingId = '';
 
@@ -76,6 +76,22 @@
             return ideas.some(idea => idea.username === item.username);
         }
 
+        function currentIdea() {
+            if (selectedId) {
+                const hit = ideas.find(item => item.id === selectedId);
+                if (hit) return hit;
+            }
+            return ideas.length ? ideas[ideas.length - 1] : null;
+        }
+
+        function upsertIdea(idea) {
+            if (!idea || !idea.id) return;
+            const idx = ideas.findIndex(item => item.id === idea.id);
+            if (idx >= 0) ideas[idx] = Object.assign({}, ideas[idx], idea);
+            else ideas = ideas.concat([idea]);
+            selectedId = idea.id;
+        }
+
         function showChart(idea) {
             if (!idea || !idea.criteria) {
                 M.renderCriteriaChart(chartEl, null, { empty: 'یک روش را ارزیابی کنید تا نمودار پنج شرط دیده شود.' });
@@ -89,8 +105,10 @@
         }
 
         function selectScored(index) {
-            selected = index;
-            showChart(ideas[selected]);
+            const idea = ideas[index];
+            if (!idea) return;
+            selectedId = idea.id;
+            showChart(idea);
             render();
         }
 
@@ -115,7 +133,7 @@
                 } else {
                     action = '<span class="badge">در انتظار Mentor</span>';
                 }
-                const linked = done && selected >= 0 && ideas[selected] && ideas[selected].id === item.evaluated_id;
+                const linked = done && currentIdea() && currentIdea().id === item.evaluated_id;
                 return `
                 <div class="idea-item ${linked ? 'active' : ''}" data-s1="${i}">
                     <span class="badge">${i + 1}</span>
@@ -145,8 +163,8 @@
 
         function render() {
             count.textContent = ideas.length + ' ایده';
-            if (selected >= ideas.length) selected = ideas.length - 1;
-            if (selected < 0 && ideas.length) selected = ideas.length - 1;
+            const idea = currentIdea();
+            if (idea) selectedId = idea.id;
             addBtn.disabled = quotaUsed() || !!processingId;
             input.disabled = quotaUsed();
             if (quotaUsed() && !processingId) {
@@ -162,7 +180,7 @@
                 return;
             }
             list.innerHTML = ideas.map((item, i) => `
-                <div class="idea-item ${i === selected ? 'active' : ''}" data-select="${i}">
+                <div class="idea-item ${item.id === selectedId ? 'active' : ''}" data-select="${i}">
                     <span class="badge">${i + 1}</span>
                     <div class="idea-text">
                         <strong>${M.escapeHtml(item.name || item.username)}</strong>
@@ -178,9 +196,9 @@
                     selectScored(parseInt(row.dataset.select, 10));
                 });
             });
-            const idea = selected >= 0 ? ideas[selected] : null;
             const canEx = hasFailed(idea) && me && (isStaff(me) || idea.username === me.username);
             examplesBtn.disabled = !canEx || !!processingId;
+            if (!processingId) showChart(idea);
         }
 
         async function addAndEvaluate() {
@@ -207,6 +225,9 @@
                     me.used_state5 = true;
                     me.points = idea.total_points || me.points;
                 }
+                upsertIdea(idea);
+                showChart(idea);
+                render();
             } catch (err) {
                 statusEl.textContent = err.message || String(err);
                 addBtn.disabled = quotaUsed();
@@ -232,11 +253,7 @@
                     me.used_state5 = true;
                     me.points = idea.total_points || me.points;
                 }
-                selected = ideas.findIndex(item => item.id === idea.id);
-                if (selected < 0 && idea.id) {
-                    ideas = ideas.concat([idea]);
-                    selected = ideas.length - 1;
-                }
+                upsertIdea(idea);
                 showChart(idea);
             } catch (err) {
                 statusEl.textContent = err.message || String(err);
@@ -247,7 +264,7 @@
         }
 
         async function loadExamples() {
-            const idea = selected >= 0 ? ideas[selected] : null;
+            const idea = currentIdea();
             if (!hasFailed(idea)) {
                 statusEl.textContent = 'ابتدا روشی را ارزیابی کنید که دست‌کم یک شرط نقض‌شده داشته باشد.';
                 return;
@@ -261,9 +278,16 @@
                     prompt: idea.text,
                     criteria: idea.criteria
                 });
-                statusEl.textContent = (data.examples || []).length ? '' : 'برای شرط‌های نقض‌شده مثالی برنگشت.';
+                const updated = data.idea || idea;
+                if (data.examples) updated.examples = data.examples;
+                updated.examplesLoaded = true;
+                upsertIdea(updated);
+                showChart(updated);
+                statusEl.textContent = (updated.examples || []).length ? 'مثال‌های نقض آماده است.' : 'برای شرط‌های نقض‌شده مثالی برنگشت.';
             } catch (err) {
                 statusEl.textContent = err.message || String(err);
+            } finally {
+                render();
             }
         }
 
@@ -274,9 +298,9 @@
             me = data.me;
             ideas = data.ideas || [];
             state1Ideas = data.state1_ideas || [];
-            if (selected < 0 && me) {
-                const mine = ideas.findIndex(item => item.username === me.username);
-                if (mine >= 0) selected = mine;
+            if (!selectedId && me) {
+                const mine = ideas.find(item => item.username === me.username);
+                if (mine) selectedId = mine.id;
             }
             if (changed) render();
         });

@@ -161,8 +161,8 @@ PANEL_IDS = [
     "vote", "s1", "s2", "s3",
     "s4", "s4-1", "s4-2", "s4-3", "s4-4", "s4-5",
     "s5",
-    "s6", "s6-1", "s6-2", "s6-3", "s6-4", "s6-5",
-    "s7",
+    "s6", "s6-1", "s6-2", "s6-3", "s6-4", "s6-5", "s6-6",
+    "s7", "s8",
 ]
 
 
@@ -178,8 +178,31 @@ def is_staff(user) -> bool:
     return is_owner(user) or is_admin(user)
 
 
+def _admin_password_env() -> str:
+    return (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+
+def _admin_password_fp(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+def _apply_admin_password(data: dict) -> bool:
+    password = _admin_password_env()
+    if not password:
+        return False
+    fp = _admin_password_fp(password)
+    if data.get("_admin_pw_fp") == fp:
+        return False
+    admin = data.setdefault("users", {}).get("admin")
+    if not admin:
+        return False
+    admin["password"] = _hash_password(password)
+    data["_admin_pw_fp"] = fp
+    return True
+
+
 def _blank() -> dict:
-    admin_password = os.environ.get("ADMIN_PASSWORD") or "admin"
+    admin_password = _admin_password_env() or "admin"
     return {
         "version": 1,
         "unlocked": ["vote"],
@@ -203,6 +226,7 @@ def _blank() -> dict:
             }
         },
         "sessions": {},
+        "_admin_pw_fp": _admin_password_fp(admin_password),
     }
 
 
@@ -227,10 +251,20 @@ def _normalize(data: dict) -> dict:
         user.setdefault("sponsor", "")
         user.setdefault("unlocked", ["vote"] if user.get("role") == "student" else list(PANEL_IDS))
         user.setdefault("hidden", [])
+        if user.get("role") in ("owner", "admin"):
+            have = set(user.get("unlocked") or [])
+            prev = set(PANEL_IDS) - {"s6-6"}
+            if prev <= have and "s6-6" not in have:
+                user["unlocked"] = list(user["unlocked"]) + ["s6-6"]
         if user.get("role") == "admin" and user.get("username") == "admin":
             user["role"] = "owner"
         if user.get("role") == "owner" and user.get("name") == "مالک":
             user["name"] = "Admin"
+    if _apply_admin_password(data):
+        data["_persist_admin_pw"] = True
+    shown = set(data.get("unlocked") or [])
+    if "s6-6" not in shown and {"s6-1", "s6-2", "s6-3", "s6-4", "s6-5"} <= shown:
+        data["unlocked"] = list(data["unlocked"]) + ["s6-6"]
     if "vote" not in data["unlocked"]:
         data["unlocked"] = ["vote"] + list(data["unlocked"])
     return data
@@ -249,7 +283,10 @@ def _load() -> dict:
             data = _blank()
             _dump(data)
             return data
-        return _normalize(data)
+        data = _normalize(data)
+        if data.pop("_persist_admin_pw", False):
+            _dump(data)
+        return data
     if not DATA_PATH.is_file():
         data = _blank()
         _dump(data)
@@ -260,7 +297,10 @@ def _load() -> dict:
         data = _blank()
         _dump(data)
         return data
-    return _normalize(data)
+    data = _normalize(data)
+    if data.pop("_persist_admin_pw", False):
+        _dump(data)
+    return data
 
 
 def _dump(data: dict) -> None:

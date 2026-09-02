@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Glimpse of Impossibility</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">ARROW</div>
+        <h2 class="cond-title">Glimpse of Impossibility</h2>
+        <p class="cond-explain">
+            اول سه رأی‌دهنده با نظرهای متفاوت. استقلال از گزینه‌های نامرتبط (IIA) می‌گوید اگر B را در همهٔ رتبه‌بندی‌ها به آخر بفرستیم، نتیجهٔ اجتماعی بین A و C نباید عوض شود. روش بوردا این‌جا نقض می‌شود.
+        </p>
+
+        <div class="side-compare">
+            <div class="compare-col">
+                <h3>قبل — B در وسط نظرها</h3>
+                <div id="beforeVoters" class="glimpse-voters"></div>
+                <div id="beforeBars"></div>
+                <div class="graph-wrap"><canvas id="beforeGraph" width="380" height="320"></canvas></div>
+                <div class="graph-legend" id="beforeLegend"></div>
+                <div style="overflow-x:auto;"><table class="matrix-table" id="beforeMatrix"></table></div>
+                <div class="result-box info" id="beforeOut"></div>
+            </div>
+            <div class="compare-col">
+                <h3>بعد — همهٔ Bها به آخر</h3>
+                <div id="afterVoters" class="glimpse-voters"></div>
+                <div id="afterBars"></div>
+                <div class="graph-wrap"><canvas id="afterGraph" width="380" height="320"></canvas></div>
+                <div class="graph-legend" id="afterLegend"></div>
+                <div style="overflow-x:auto;"><table class="matrix-table" id="afterMatrix"></table></div>
+                <div class="result-box loss" id="afterOut"></div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:18px;">
+            <div class="section-kicker">PROFILE O · فقط A و X</div>
+            <div class="card-header">
+                <span>نامتناهی رأی‌دهنده: ۵ نفر، ⋯، ۴ نفر</span>
+                <button class="primary" id="dotsToEndBtn" type="button">انتقال همهٔ نقطه‌چین‌ها به آخر</button>
+            </div>
+            <p class="text-muted" style="margin-bottom:8px;">
+                همان پروفایل O از اثبات ارو، با حذف C و نام‌گذاری B به X. نقطه‌چین یک خانهٔ رتبه است. پنج رأی‌دهنده، بعد ⋯، بعد چهار رأی‌دهنده.
+            </p>
+            <div id="infiniteVoters" class="glimpse-voters"></div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>جدول کندورسه</span></div>
+                    <div style="overflow-x:auto;"><table class="matrix-table" id="infMatrix"></table></div>
+                    <div id="infPairs" style="margin-top:10px;"></div>
+                    <div class="result-box win" id="infOut"></div>
+                </div>
+                <div>
+                    <div class="card-header"><span>گراف</span></div>
+                    <div class="graph-wrap"><canvas id="infGraph" width="420" height="360"></canvas></div>
+                    <div class="graph-legend" id="infLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const TWO = ['A', 'X'];
+        const beforeRanks = ['A>B>C', 'B>C>A', 'C>A>B'];
+        const afterRanks = beforeRanks.map(rank => {
+            const rest = M.parseRanking(rank).filter(c => c !== 'B');
+            rest.push('B');
+            return rest.join('>');
+        });
+        const DOT = '…';
+        const infiniteRanks = [
+            ...Array.from({ length: 5 }, () => ['A', DOT, 'X']),
+            ...Array.from({ length: 4 }, () => ['X', DOT, 'A'])
+        ];
+
+        function stackHtml(rank) {
+            const parts = M.parseRanking(rank);
+            return parts.map((c, i) => {
+                const letter = `<div class="item ${c}">${c}</div>`;
+                const dots = i < parts.length - 1 ? '<div class="glimpse-dots">·<br>·<br>·</div>' : '';
+                return letter + dots;
+            }).join('');
+        }
+
+        function itemHtml(c, key) {
+            if (c === DOT) {
+                return `<div class="item dots" draggable="true" data-candidate="${DOT}" data-key="${key}">·<br>·<br>·</div>`;
+            }
+            return `<div class="item ${c}" draggable="true" data-candidate="${c}" data-key="${key}">${c}</div>`;
+        }
+
+        function paintVoters(el, ranks, infinite) {
+            const cols = ranks.map((rank, i) => `
+                <div class="glimpse-voter">
+                    <div class="glimpse-num">V${i + 1}</div>
+                    <div class="glimpse-stack">${stackHtml(rank)}</div>
+                </div>`).join('');
+            const more = infinite ? '<div class="glimpse-more" title="infinite voters">⋯</div>' : '';
+            el.innerHTML = cols + more;
+        }
+
+        function voterCol(rank, i) {
+            return `<div class="glimpse-voter" data-voter="${i}">
+                <div class="glimpse-num">V${i + 1}</div>
+                <div class="glimpse-stack">${rank.map((c, j) => itemHtml(c, `inf-${i}-${j}`)).join('')}</div>
+            </div>`;
+        }
+
+        function paintInfiniteVoters() {
+            const el = document.getElementById('infiniteVoters');
+            const left = infiniteRanks.slice(0, 5).map((rank, i) => voterCol(rank, i)).join('');
+            const right = infiniteRanks.slice(5).map((rank, i) => voterCol(rank, i + 5)).join('');
+            el.innerHTML = left + '<div class="glimpse-more" title="infinite voters">⋯</div>' + right;
+        }
+
+        function abRanks() {
+            return infiniteRanks.map(rank => rank.filter(c => c === 'A' || c === 'X').join('>'));
+        }
+
+        function bordaLine(ranks, cands) {
+            const br = M.borda(ranks, cands);
+            const scores = cands.map(c => `${c}: ${br.scores[c] || 0}`).join(' · ');
+            return { winner: br.winner, scores };
+        }
+
+        function paintProfile(ranks, cands, ids) {
+            const counts = M.buildCounts(ranks, cands);
+            const br = bordaLine(ranks, cands);
+            const cw = M.hasCondorcet(counts, cands);
+            if (ids.bars) {
+                M.renderScoreBars(document.getElementById(ids.bars), M.plurality(ranks, cands).counts, cands);
+            }
+            M.drawGraph(document.getElementById(ids.graph), counts, { candidates: cands, highlightWinner: cw || br.winner });
+            document.getElementById(ids.legend).innerHTML = M.legendHtml(counts, { candidates: cands });
+            M.renderMatrixTable(document.getElementById(ids.matrix), counts, cands);
+            document.getElementById(ids.out).innerHTML =
+                `بوردا: <strong>${br.winner || 'مساوی'}</strong> (${br.scores})` +
+                `<br>کندورسه: <strong>${cw || 'ندارد'}</strong>`;
+            if (ids.pairs) document.getElementById(ids.pairs).innerHTML = M.pairTallyHtml(counts, cands);
+        }
+
+        paintVoters(document.getElementById('beforeVoters'), beforeRanks, false);
+        paintVoters(document.getElementById('afterVoters'), afterRanks, false);
+        paintInfiniteVoters();
+
+        paintProfile(beforeRanks, THREE, {
+            bars: 'beforeBars', graph: 'beforeGraph', legend: 'beforeLegend',
+            matrix: 'beforeMatrix', out: 'beforeOut'
+        });
+        paintProfile(afterRanks, THREE, {
+            bars: 'afterBars', graph: 'afterGraph', legend: 'afterLegend',
+            matrix: 'afterMatrix', out: 'afterOut'
+        });
+        function paintInfiniteProfile() {
+            paintProfile(abRanks(), TWO, {
+                bars: null, graph: 'infGraph', legend: 'infLegend',
+                matrix: 'infMatrix', out: 'infOut', pairs: 'infPairs'
+            });
+        }
+        paintInfiniteProfile();
+
+        document.getElementById('dotsToEndBtn').addEventListener('click', () => {
+            infiniteRanks.forEach(rank => {
+                const rest = rank.filter(c => c !== DOT);
+                rank.splice(0, rank.length, ...rest, DOT);
+            });
+            paintInfiniteVoters();
+            paintInfiniteProfile();
+        });
+
+        (function bindInfiniteDrag() {
+            const root = document.getElementById('infiniteVoters');
+            let dragged = null;
+            root.addEventListener('dragstart', e => {
+                const item = e.target.closest('.item');
+                if (!item) return;
+                dragged = item;
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', item.dataset.candidate);
+            });
+            root.addEventListener('dragend', () => {
+                root.querySelectorAll('.item').forEach(x => x.classList.remove('dragging', 'drag-over'));
+                dragged = null;
+            });
+            root.addEventListener('dragover', e => {
+                const item = e.target.closest('.item');
+                if (!dragged || !item || item === dragged || item.parentElement !== dragged.parentElement) return;
+                e.preventDefault();
+                root.querySelectorAll('.item.drag-over').forEach(x => { if (x !== item) x.classList.remove('drag-over'); });
+                item.classList.add('drag-over');
+            });
+            root.addEventListener('dragleave', e => {
+                const item = e.target.closest('.item');
+                if (item && !item.contains(e.relatedTarget)) item.classList.remove('drag-over');
+            });
+            root.addEventListener('drop', e => {
+                e.preventDefault();
+                const el = e.target.closest('.item');
+                if (!dragged || !el || el === dragged) return;
+                el.classList.remove('drag-over');
+                const stack = dragged.parentElement;
+                if (!stack || stack !== el.parentElement) return;
+                const voter = stack.closest('.glimpse-voter');
+                const vi = voter ? parseInt(voter.dataset.voter, 10) : -1;
+                const arr = infiniteRanks[vi];
+                if (!arr) return;
+                const a = arr.indexOf(dragged.dataset.candidate);
+                const b = arr.indexOf(el.dataset.candidate);
+                if (a < 0 || b < 0) return;
+                arr.splice(a, 1);
+                arr.splice(b, 0, dragged.dataset.candidate);
+                const items = [...stack.querySelectorAll('.item')];
+                arr.forEach(c => {
+                    const node = items.find(x => x.dataset.candidate === c);
+                    if (node) stack.appendChild(node);
+                });
+                paintInfiniteProfile();
+            });
+        })();
+    </script>
+</body>
+</html>

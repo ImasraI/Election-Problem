@@ -7,7 +7,7 @@
         '#2f9e8f', '#c45c8a', '#4a7c59', '#b85c38', '#3d6ea8',
         '#8b5e3c', '#5c7a2f'
     ];
-    const COLORS = { A: '#d45d5d', B: '#3d8c7a', C: '#3b7fa8', D: '#c9842a', E: '#7c5cbf', F: '#2f9e8f', G: '#c45c8a', H: '#4a7c59' };
+    const COLORS = { A: '#d45d5d', B: '#3d8c7a', C: '#3b7fa8', D: '#c9842a', E: '#7c5cbf', F: '#2f9e8f', G: '#c45c8a', H: '#4a7c59', X: '#c9842a' };
     const CYCLE_PALETTE = ['#ff5d7d', '#f9b44a', '#39d3ff', '#c084fc', '#4ade80', '#fb7185', '#22d3ee', '#f472b6'];
     const MEDALS = ['۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸'];
     const IDEA_KEY = 'mentor-ideas';

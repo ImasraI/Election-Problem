@@ -630,6 +630,172 @@ button:disabled, .tab-btn.locked, .sub-tab-btn.locked {
     align-items: center;
 }
 .admin-create input { min-width: 140px; }
+.points-board { margin-top: 8px; }
+.points-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.points-place {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+    background: rgba(57, 211, 255, .12);
+    color: var(--c-cyan-light);
+    flex-shrink: 0;
+}
+.points-who { flex: 1; min-width: 0; }
+.points-who strong { display: block; }
+.points-val {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--c-cyan-light);
+    min-width: 42px;
+    text-align: left;
+}
+.glimpse-voters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    direction: ltr;
+    justify-content: center;
+    margin: 12px 0;
+}
+.glimpse-voter, .glimpse-more {
+    min-width: 72px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 12px;
+    padding: 8px 7px;
+    background: rgba(255,255,255,.03);
+    text-align: center;
+}
+.glimpse-num {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--c-muted);
+    margin-bottom: 6px;
+}
+.glimpse-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-height: 168px;
+}
+.glimpse-stack .item {
+    width: 100%;
+    min-height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 900;
+    font-size: 18px;
+}
+.glimpse-stack .item[draggable="true"] { cursor: grab; }
+.glimpse-stack .item.dragging { opacity: .35; transform: scale(.96); }
+.glimpse-stack .item.drag-over { outline: 2px dashed var(--c-cyan); outline-offset: 1px; }
+.glimpse-stack .item.A { background: var(--c-a); }
+.glimpse-stack .item.B { background: var(--c-b); }
+.glimpse-stack .item.C { background: var(--c-c); }
+.glimpse-stack .item.X { background: #c9842a; }
+.glimpse-stack .item.dots {
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
+    color: var(--c-muted);
+    font-size: 16px;
+    font-weight: 900;
+    line-height: .42;
+    letter-spacing: 0;
+    padding: 6px 0;
+}
+.glimpse-dots {
+    color: var(--c-muted);
+    font-weight: 900;
+    line-height: .45;
+    font-size: 16px;
+    padding: 4px 0;
+    user-select: none;
+}
+.glimpse-more {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 168px;
+    color: var(--c-muted);
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: .08em;
+}
+.summary-intro {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.8;
+}
+.criteria-compare-wrap {
+    overflow-x: auto;
+    border-radius: 14px;
+    border: 1px solid rgba(158, 201, 234, .45);
+}
+.criteria-compare {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    background: #f4f9ff;
+    color: #1a2744;
+    font-size: 15px;
+}
+.criteria-compare th {
+    background: #9ec9ea;
+    color: #14324f;
+    padding: 12px 10px;
+    font-weight: 800;
+    text-align: center;
+    white-space: nowrap;
+}
+.criteria-compare th:first-child { text-align: right; }
+.criteria-compare td {
+    padding: 12px 10px;
+    text-align: center;
+    border-bottom: 1px solid #c5d9ec;
+    vertical-align: middle;
+}
+.criteria-compare td:first-child {
+    text-align: right;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.criteria-compare tbody tr:nth-child(odd) { background: #f7fbff; }
+.criteria-compare tbody tr:nth-child(even) { background: #e7f2fb; }
+.criteria-compare .method-en {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5a7394;
+    margin-top: 2px;
+}
+.mark-yes {
+    color: #16a34a;
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1;
+}
+.mark-no {
+    color: #e11d48;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+}
 .user-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
 .user-table th, .user-table td { text-align: right; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .results-grid {

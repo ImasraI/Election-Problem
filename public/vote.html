@@ -194,8 +194,6 @@
             }).join('');
             document.getElementById('tally').innerHTML = `
                 <p>برنده اکثریت نسبی: <strong>${plur.winner || '—'}</strong></p>
-                <p>برنده بوردا: <strong>${borda.winner || '—'}</strong></p>
-                <p>برنده کندورسه: <strong>${counts ? (M.hasCondorcet(counts, cands) || 'ندارد') : '—'}</strong></p>
                 <div class="rank-tally">${cols}</div>`;
         }
 
