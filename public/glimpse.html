@@ -74,8 +74,11 @@
         });
         const DOT = '…';
         const infiniteRanks = [
-            ...Array.from({ length: 5 }, () => ['A', DOT, 'X']),
-            ...Array.from({ length: 4 }, () => ['X', DOT, 'A'])
+            ['A', DOT, 'X'],
+            ['X', 'A', DOT],
+            [DOT, 'X', 'A', DOT],
+            [DOT, 'X', 'A', DOT],
+            [DOT, 'X', 'A']
         ];
 
         function stackHtml(rank) {
@@ -113,8 +116,8 @@
 
         function paintInfiniteVoters() {
             const el = document.getElementById('infiniteVoters');
-            const left = infiniteRanks.slice(0, 5).map((rank, i) => voterCol(rank, i)).join('');
-            const right = infiniteRanks.slice(5).map((rank, i) => voterCol(rank, i + 5)).join('');
+            const left = infiniteRanks.slice(0, 2).map((rank, i) => voterCol(rank, i)).join('');
+            const right = infiniteRanks.slice(2).map((rank, i) => voterCol(rank, i + 2)).join('');
             el.innerHTML = left + '<div class="glimpse-more" title="infinite voters">⋯</div>' + right;
         }
 
@@ -166,8 +169,9 @@
 
         document.getElementById('dotsToEndBtn').addEventListener('click', () => {
             infiniteRanks.forEach(rank => {
+                const dots = rank.filter(c => c === DOT);
                 const rest = rank.filter(c => c !== DOT);
-                rank.splice(0, rank.length, ...rest, DOT);
+                rank.splice(0, rank.length, ...rest, ...dots);
             });
             paintInfiniteVoters();
             paintInfiniteProfile();
@@ -210,16 +214,13 @@
                 const vi = voter ? parseInt(voter.dataset.voter, 10) : -1;
                 const arr = infiniteRanks[vi];
                 if (!arr) return;
-                const a = arr.indexOf(dragged.dataset.candidate);
-                const b = arr.indexOf(el.dataset.candidate);
-                if (a < 0 || b < 0) return;
-                arr.splice(a, 1);
-                arr.splice(b, 0, dragged.dataset.candidate);
                 const items = [...stack.querySelectorAll('.item')];
-                arr.forEach(c => {
-                    const node = items.find(x => x.dataset.candidate === c);
-                    if (node) stack.appendChild(node);
-                });
+                const a = items.indexOf(dragged);
+                const b = items.indexOf(el);
+                if (a < 0 || b < 0) return;
+                const [moved] = arr.splice(a, 1);
+                arr.splice(b, 0, moved);
+                paintInfiniteVoters();
                 paintInfiniteProfile();
             });
         })();

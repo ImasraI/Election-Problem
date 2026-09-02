@@ -41,6 +41,14 @@
         let ideas = [];
         let me = null;
 
+        function isStaff(user) {
+            return user && (user.role === 'admin' || user.role === 'owner');
+        }
+        function canDelete(item) {
+            if (!me || !item) return false;
+            return isStaff(me) || item.username === me.username;
+        }
+
         function render() {
             count.textContent = ideas.length + ' ایده';
             const used = !!(me && me.role === 'student' && me.used_state1);
@@ -59,7 +67,14 @@
                         <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
                         <div>${M.escapeHtml(item.text || '')}</div>
                     </div>
+                    ${canDelete(item) ? `<div class="idea-actions"><button class="outline idea-del" type="button" data-del="${M.escapeHtml(item.id)}">حذف</button></div>` : ''}
                 </div>`).join('');
+            list.querySelectorAll('[data-del]').forEach(btn => {
+                btn.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    deleteIdea(btn.getAttribute('data-del'));
+                });
+            });
         }
 
         addBtn.addEventListener('click', async () => {
@@ -82,6 +97,27 @@
                 addBtn.click();
             }
         });
+
+        async function deleteIdea(id) {
+            if (!id) return;
+            if (!confirm('این ایده حذف شود؟')) return;
+            statusEl.textContent = 'در حال حذف…';
+            try {
+                const data = await Workshop.request('POST', '/api/ideas/delete', { id, source: 'state1' });
+                ideas = ideas.filter(item => item.id !== id);
+                if (data && data.me) {
+                    me = Object.assign({}, me || {}, data.me);
+                    if (!me.used_state1) {
+                        addBtn.disabled = false;
+                        input.disabled = false;
+                    }
+                }
+                statusEl.textContent = 'ایده حذف شد.';
+                render();
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            }
+        }
 
         Workshop.startPolling((data, changed) => {
             me = data.me;

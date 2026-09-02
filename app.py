@@ -204,6 +204,18 @@ async def state1_evaluate(request: Request):
         return JSONResponse({"error": str(exc)}, status_code=502)
 
 
+@app.post("/api/ideas/delete")
+async def ideas_delete(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        return workshop.delete_idea(user, body.get("id") or "", body.get("source") or "")
+    except CATCH as exc:
+        return fail(exc)
+
+
 @app.post("/api/admin/reset")
 def admin_reset(request: Request):
     user, err = require_user(request)

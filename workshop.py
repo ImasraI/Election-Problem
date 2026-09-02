@@ -162,7 +162,7 @@ PANEL_IDS = [
     "s4", "s4-1", "s4-2", "s4-3", "s4-4", "s4-5",
     "s5",
     "s6", "s6-1", "s6-2", "s6-3", "s6-4", "s6-5", "s6-6",
-    "s7", "s8",
+    "s8", "s7",
 ]
 
 
@@ -935,6 +935,72 @@ def process_state1_idea(actor: dict, idea_id: str) -> dict:
         idea["used_state5"] = True
         idea["total_points"] = int((author or {}).get("points") or points)
         return idea
+
+
+def _can_delete_idea(actor: dict, idea: dict, data: dict) -> bool:
+    if not idea:
+        return False
+    if _idea_class(data, idea) != _class_key(actor):
+        return False
+    if is_staff(actor):
+        return True
+    return (idea.get("username") or "") == (actor.get("username") or "")
+
+
+def _drop_state5(data: dict, idea_id: str) -> None:
+    idea = next((item for item in data.get("ideas") or [] if item.get("id") == idea_id), None)
+    if not idea:
+        return
+    author = data["users"].get(idea.get("username") or "")
+    if author and author.get("role") == "student":
+        author["used_state5"] = False
+        author["points"] = max(0, int(author.get("points") or 0) - int(idea.get("points") or 0))
+    for src in data.get("state1_ideas") or []:
+        if src.get("evaluated_id") == idea_id or src.get("id") == idea.get("from_state1_id"):
+            src.pop("evaluated_id", None)
+            src["processed"] = False
+    data["ideas"] = [item for item in (data.get("ideas") or []) if item.get("id") != idea_id]
+
+
+def delete_idea(actor: dict, idea_id: str, source: str = "") -> dict:
+    idea_id = (idea_id or "").strip()
+    source = (source or "").strip().lower()
+    if not idea_id:
+        raise ValueError("ایده مشخص نشده.")
+    with _lock:
+        data = _load()
+        stored = data["users"].get(actor["username"])
+        if not stored:
+            raise ValueError("حساب پیدا نشد.")
+        s1 = next((item for item in data.get("state1_ideas") or [] if item.get("id") == idea_id), None)
+        s5 = next((item for item in data.get("ideas") or [] if item.get("id") == idea_id), None)
+        if source == "state1":
+            target, kind = s1, "state1"
+        elif source in ("state5", "ideas"):
+            target, kind = s5, "state5"
+        elif s1:
+            target, kind = s1, "state1"
+        else:
+            target, kind = s5, "state5"
+        if not target:
+            raise ValueError("ایده پیدا نشد.")
+        if not _can_delete_idea(stored, target, data):
+            raise PermissionError("اجازه حذف این ایده را ندارید.")
+        if kind == "state1":
+            linked = target.get("evaluated_id") or ""
+            author = data["users"].get(target.get("username") or "")
+            if author:
+                author["used_state1"] = False
+            data["state1_ideas"] = [
+                item for item in (data.get("state1_ideas") or []) if item.get("id") != idea_id
+            ]
+            if linked:
+                _drop_state5(data, linked)
+        else:
+            _drop_state5(data, idea_id)
+        _bump(data)
+        _dump(data)
+        return {"ok": True, "source": kind, "me": _public_user(stored)}
 
 
 def reset_workshop(actor: dict) -> None:

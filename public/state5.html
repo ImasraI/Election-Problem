@@ -75,6 +75,14 @@
             if (item.evaluated_id) return false;
             return ideas.some(idea => idea.username === item.username);
         }
+        function canDelete(item) {
+            if (!me || !item) return false;
+            return isStaff(me) || item.username === me.username;
+        }
+        function deleteBtn(id, source) {
+            if (!id) return '';
+            return `<button class="outline idea-del" type="button" data-del="${M.escapeHtml(id)}" data-source="${source}">حذف</button>`;
+        }
 
         function currentIdea() {
             if (selectedId) {
@@ -134,6 +142,7 @@
                     action = '<span class="badge">در انتظار Mentor</span>';
                 }
                 const linked = done && currentIdea() && currentIdea().id === item.evaluated_id;
+                const del = canDelete(item) ? deleteBtn(item.id, 'state1') : '';
                 return `
                 <div class="idea-item ${linked ? 'active' : ''}" data-s1="${i}">
                     <span class="badge">${i + 1}</span>
@@ -142,7 +151,7 @@
                         <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
                         <div>${M.escapeHtml(item.text || '')}</div>
                     </div>
-                    <div class="idea-actions">${action}</div>
+                    <div class="idea-actions">${action}${del}</div>
                 </div>`;
             }).join('');
             state1List.querySelectorAll('[data-s1]').forEach(row => {
@@ -159,6 +168,7 @@
                     processState1(btn.getAttribute('data-process'));
                 });
             });
+            bindDeleteButtons(state1List);
         }
 
         function render() {
@@ -187,15 +197,19 @@
                         <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
                         <div>${M.escapeHtml(item.text || '')}</div>
                     </div>
+                    <div class="idea-actions">
                             <span class="badge ${item.criteria && item.criteria.valid === false ? 'cycle' : (item.criteria && Object.entries(item.criteria).filter(([k]) => k !== 'valid').every(([, v]) => v) ? 'condorcet' : 'cycle')}">
                                 ${item.criteria && item.criteria.valid === false ? 'روش نیست' : ((item.points || 0) + ' امتیاز')}
                             </span>
+                        ${canDelete(item) ? deleteBtn(item.id, 'state5') : ''}
+                    </div>
                 </div>`).join('');
             list.querySelectorAll('[data-select]').forEach(row => {
                 row.addEventListener('click', () => {
                     selectScored(parseInt(row.dataset.select, 10));
                 });
             });
+            bindDeleteButtons(list);
             const canEx = hasFailed(idea) && me && (isStaff(me) || idea.username === me.username);
             examplesBtn.disabled = !canEx || !!processingId;
             if (!processingId) showChart(idea);
@@ -293,6 +307,47 @@
 
         addBtn.addEventListener('click', addAndEvaluate);
         examplesBtn.addEventListener('click', loadExamples);
+
+        function bindDeleteButtons(root) {
+            root.querySelectorAll('[data-del]').forEach(btn => {
+                btn.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    deleteIdea(btn.getAttribute('data-del'), btn.getAttribute('data-source') || '');
+                });
+            });
+        }
+
+        async function deleteIdea(id, source) {
+            if (!id) return;
+            if (!confirm('این ایده حذف شود؟')) return;
+            statusEl.textContent = 'در حال حذف…';
+            try {
+                const data = await Workshop.request('POST', '/api/ideas/delete', { id, source });
+                if (source === 'state1') {
+                    const gone = state1Ideas.find(item => item.id === id);
+                    state1Ideas = state1Ideas.filter(item => item.id !== id);
+                    if (gone && gone.evaluated_id) {
+                        ideas = ideas.filter(item => item.id !== gone.evaluated_id);
+                        if (selectedId === gone.evaluated_id) selectedId = '';
+                    }
+                } else {
+                    ideas = ideas.filter(item => item.id !== id);
+                    if (selectedId === id) selectedId = '';
+                    state1Ideas = state1Ideas.map(item => {
+                        if (item.evaluated_id !== id && item.id !== id) return item;
+                        const next = Object.assign({}, item);
+                        delete next.evaluated_id;
+                        next.processed = false;
+                        return next;
+                    });
+                }
+                if (data && data.me) me = Object.assign({}, me || {}, data.me);
+                statusEl.textContent = 'ایده حذف شد.';
+                render();
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            }
+        }
 
         Workshop.startPolling((data, changed) => {
             me = data.me;
