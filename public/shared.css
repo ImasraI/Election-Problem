@@ -297,10 +297,12 @@ button:disabled { opacity: .4; cursor: default; transform: none; }
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    padding: 4px 0;
+    padding: 6px 0;
     font-size: 15px;
     font-weight: 700;
+    border-bottom: 1px solid rgba(255,255,255,.06);
 }
+.combo-row:last-child { border-bottom: none; }
 .combo-rank {
     direction: ltr;
     unicode-bidi: isolate;
@@ -370,9 +372,30 @@ button:disabled { opacity: .4; cursor: default; transform: none; }
     border: 1px solid rgba(255,255,255,.08); padding: 8px;
 }
 .graph-wrap canvas {
-    width: 100%; max-width: 400px; height: auto; aspect-ratio: 1/1;
-    display: block; border-radius: 12px; background: rgba(6, 9, 19, .6);
+    width: 100%; max-width: 440px; height: auto; aspect-ratio: 1/1;
+    display: block; border-radius: 12px;
+    background: radial-gradient(circle at 50% 42%, rgba(28, 52, 82, .55), rgba(6, 9, 19, .72));
 }
+.graph-legend .legend-hint { opacity: .85; }
+.score-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; margin-top: 5px;
+}
+.score-bar .score-pill {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 900; font-size: 14px;
+    flex-shrink: 0;
+}
+.score-bar .bar {
+    flex: 1; height: 14px; border-radius: 99px;
+    background: rgba(255,255,255,.08); overflow: hidden;
+}
+.score-bar .score-pct {
+    min-width: 2.4em; text-align: left; font-size: 12px; color: var(--c-muted); font-weight: 700;
+}
+.pairwise-contrib .pair-score { font-weight: 800; color: var(--c-text); }
+.pairwise-contrib .pair-names { font-weight: 800; }
 .graph-legend {
     display: flex; justify-content: center; gap: 14px;
     margin-top: 8px; font-size: 12px; color: var(--c-muted); flex-wrap: wrap;
@@ -549,14 +572,6 @@ button:disabled { opacity: .4; cursor: default; transform: none; }
 }
 .idea-item .idea-text { flex: 1; font-size: 14px; line-height: 1.7; }
 .idea-item input { flex: 1; }
-.score-bar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 6px 10px; margin-top: 4px;
-}
-.score-bar .bar {
-    flex: 1; height: 10px; border-radius: 99px;
-    background: rgba(255,255,255,.08); overflow: hidden;
-}
 .score-bar .bar > span {
     display: block; height: 100%; border-radius: 99px;
     background: var(--c-cyan);

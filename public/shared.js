@@ -268,35 +268,152 @@
         return true;
     }
 
-    function drawArrow(ctx, x1, y1, x2, y2, color, lineWidth) {
+    function graphSurface(canvas) {
+        const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
+        const attrW = parseInt(canvas.getAttribute('width'), 10) || 420;
+        const attrH = parseInt(canvas.getAttribute('height'), 10) || 420;
+        const cssW = canvas.clientWidth > 24 ? canvas.clientWidth : attrW;
+        const cssH = canvas.clientHeight > 24 ? canvas.clientHeight : attrH;
+        const bw = Math.max(1, Math.round(cssW * dpr));
+        const bh = Math.max(1, Math.round(cssH * dpr));
+        if (canvas.width !== bw || canvas.height !== bh) {
+            canvas.width = bw;
+            canvas.height = bh;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { ctx, W: cssW, H: cssH };
+    }
+
+    function drawScorePill(ctx, x, y, text, color) {
+        ctx.save();
+        ctx.font = '700 12px Vazirmatn, Tahoma, sans-serif';
+        const padX = 9, h = 22;
+        const w = ctx.measureText(text).width + padX * 2;
+        const left = x - w / 2, top = y - h / 2;
+        ctx.beginPath();
+        const r = 11;
+        ctx.moveTo(left + r, top);
+        ctx.arcTo(left + w, top, left + w, top + h, r);
+        ctx.arcTo(left + w, top + h, left, top + h, r);
+        ctx.arcTo(left, top + h, left, top, r);
+        ctx.arcTo(left, top, left + w, top, r);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(8, 12, 24, .96)';
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.fillStyle = '#f4f7fb';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x, y + 0.5);
+        ctx.restore();
+    }
+
+    function drawChevron(ctx, x, y, angle, size, color) {
+        const spread = 0.72;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2.6, size * 0.24);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(x - size * Math.cos(angle - spread), y - size * Math.sin(angle - spread));
+        ctx.lineTo(x, y);
+        ctx.lineTo(x - size * Math.cos(angle + spread), y - size * Math.sin(angle + spread));
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawArrowHead(ctx, tipX, tipY, angle, size, color) {
+        const spread = 0.52;
+        const p0 = { x: tipX, y: tipY };
+        const p1 = {
+            x: tipX - size * Math.cos(angle - spread),
+            y: tipY - size * Math.sin(angle - spread)
+        };
+        const p2 = {
+            x: tipX - size * Math.cos(angle + spread),
+            y: tipY - size * Math.sin(angle + spread)
+        };
+        const pts = [p0, p1, p2];
+        const n = pts.length;
+        const radius = Math.max(3.5, size * 0.16);
+        ctx.save();
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const prev = pts[(i + n - 1) % n];
+            const curr = pts[i];
+            const next = pts[(i + 1) % n];
+            const v1x = curr.x - prev.x, v1y = curr.y - prev.y;
+            const v2x = next.x - curr.x, v2y = next.y - curr.y;
+            const l1 = Math.hypot(v1x, v1y) || 1;
+            const l2 = Math.hypot(v2x, v2y) || 1;
+            const r = Math.min(radius, l1 / 2.5, l2 / 2.5);
+            const sx = curr.x - (v1x / l1) * r;
+            const sy = curr.y - (v1y / l1) * r;
+            const ex = curr.x + (v2x / l2) * r;
+            const ey = curr.y + (v2y / l2) * r;
+            if (i === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx, sy);
+            ctx.quadraticCurveTo(curr.x, curr.y, ex, ey);
+        }
+        ctx.closePath();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function drawArrow(ctx, x1, y1, x2, y2, color, lineWidth, nodeR) {
         lineWidth = lineWidth || 3.5;
+        nodeR = nodeR || 26;
         const dx = x2 - x1, dy = y2 - y1;
         const len = Math.sqrt(dx * dx + dy * dy);
         if (len < 1) return;
         const ux = dx / len, uy = dy / len;
-        const shrink = 26;
-        const startX = x1 + ux * shrink, startY = y1 + uy * shrink;
-        const endX = x2 - ux * shrink, endY = y2 - uy * shrink;
+        const angle = Math.atan2(uy, ux);
+        const headSize = 26 + lineWidth * 0.5;
+        const startX = x1 + ux * (nodeR + 5);
+        const startY = y1 + uy * (nodeR + 5);
+        const tipX = x2 - ux * (nodeR + 8);
+        const tipY = y2 - uy * (nodeR + 8);
+        const shaftEndX = tipX - ux * (headSize * 0.72);
+        const shaftEndY = tipY - uy * (headSize * 0.72);
+        const half = Math.max(2.4, lineWidth * 0.6);
+        const nx = -uy, ny = ux;
+
         ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = lineWidth;
-        ctx.shadowColor = color + '50';
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
         ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-        const angle = Math.atan2(endY - startY, endX - startX);
-        const headLen = 14, headAngle = 0.45;
-        ctx.fillStyle = color;
-        ctx.shadowColor = 'transparent';
-        ctx.beginPath();
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - headLen * Math.cos(angle - headAngle), endY - headLen * Math.sin(angle - headAngle));
-        ctx.lineTo(endX - headLen * Math.cos(angle + headAngle), endY - headLen * Math.sin(angle + headAngle));
+        ctx.moveTo(startX + nx * half, startY + ny * half);
+        ctx.lineTo(shaftEndX + nx * half * 0.75, shaftEndY + ny * half * 0.75);
+        ctx.lineTo(shaftEndX - nx * half * 0.75, shaftEndY - ny * half * 0.75);
+        ctx.lineTo(startX - nx * half, startY - ny * half);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+
+        const shaftLen = Math.hypot(shaftEndX - startX, shaftEndY - startY);
+        if (shaftLen > 40) {
+            drawChevron(ctx, startX + ux * shaftLen * 0.36, startY + uy * shaftLen * 0.36, angle, 12, color);
+            if (shaftLen > 70) {
+                drawChevron(ctx, startX + ux * shaftLen * 0.58, startY + uy * shaftLen * 0.58, angle, 12, color);
+            }
+        }
+
+        return {
+            mx: (startX + shaftEndX) / 2,
+            my: (startY + shaftEndY) / 2,
+            ux, uy,
+            head: { tipX, tipY, angle, size: headSize, color }
+        };
     }
 
     function layoutPositions(cands, cx, cy, radius) {
@@ -312,22 +429,44 @@
     function drawGraph(canvas, counts, opts) {
         if (!canvas || typeof canvas.getContext !== 'function') return;
         opts = opts || {};
+        canvas.__lastGraph = { counts: counts || null, opts: opts };
+        if (canvas.__drawing) return;
+        canvas.__drawing = true;
+        try {
+        if (!canvas.__graphRo && typeof ResizeObserver !== 'undefined') {
+            let lastW = 0, lastH = 0;
+            canvas.__graphRo = new ResizeObserver(() => {
+                const w = canvas.clientWidth, h = canvas.clientHeight;
+                if (w < 24 || h < 24) return;
+                if (w === lastW && h === lastH) return;
+                lastW = w;
+                lastH = h;
+                const last = canvas.__lastGraph;
+                if (last) drawGraph(canvas, last.counts, last.opts);
+            });
+            canvas.__graphRo.observe(canvas.parentElement || canvas);
+        }
         const cands = opts.candidates || CANDIDATES;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        const W = canvas.width || 420, H = canvas.height || 420;
-        if (canvas.width !== W) canvas.width = W;
-        if (canvas.height !== H) canvas.height = H;
+        const { ctx, W, H } = graphSurface(canvas);
         ctx.clearRect(0, 0, W, H);
+
+        const bg = ctx.createRadialGradient(W / 2, H / 2, 8, W / 2, H / 2, Math.max(W, H) * 0.62);
+        bg.addColorStop(0, 'rgba(18, 36, 58, .55)');
+        bg.addColorStop(1, 'rgba(6, 10, 20, .15)');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, W, H);
+
         if (!counts) {
             ctx.fillStyle = '#93a5c2';
-            ctx.font = '16px Vazirmatn, sans-serif';
+            ctx.font = '16px Vazirmatn, Tahoma, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(opts.emptyText || 'رأی اضافه کنید', W / 2, H / 2);
             return;
         }
-        const radius = Math.min(W, H) * (0.30 + Math.min(cands.length, 8) * 0.008);
+
+        const nodeR = cands.length > 5 ? 20 : 24;
+        const radius = Math.min(W, H) * (0.28 + Math.min(cands.length, 8) * 0.01);
         const pos = layoutPositions(cands, W / 2, H / 2, radius);
         const cycles = findCycles(counts, cands);
         const edgeCycles = {};
@@ -339,69 +478,99 @@
                 edgeCycles[k].push(idx);
             }
         });
+        const totalVoters = Math.max(1, ...cands.flatMap((a, i) =>
+            cands.slice(i + 1).map(b => {
+                const r = getResult(counts, a, b);
+                return (r.ca || 0) + (r.cb || 0);
+            })
+        ));
 
+        const labels = [];
+        const heads = [];
         for (let i = 0; i < cands.length; i++) {
             for (let j = i + 1; j < cands.length; j++) {
                 const a = cands[i], b = cands[j];
                 const r = getResult(counts, a, b);
+                const pA = pos[a], pB = pos[b];
+                if (!pA || !pB) continue;
                 if (!r.winner) {
+                    ctx.save();
                     ctx.beginPath();
                     ctx.setLineDash([5, 5]);
-                    ctx.strokeStyle = 'rgba(255,255,255,.28)';
-                    ctx.lineWidth = 1.5;
-                    ctx.moveTo(pos[a].x, pos[a].y);
-                    ctx.lineTo(pos[b].x, pos[b].y);
+                    ctx.strokeStyle = 'rgba(255,255,255,.32)';
+                    ctx.lineWidth = 1.6;
+                    ctx.moveTo(pA.x, pA.y);
+                    ctx.lineTo(pB.x, pB.y);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                    ctx.restore();
+                    labels.push({
+                        x: (pA.x + pB.x) / 2,
+                        y: (pA.y + pB.y) / 2,
+                        text: r.ca === r.cb && r.ca ? `${r.ca}–${r.cb}` : 'مساوی',
+                        color: 'rgba(200,210,230,.9)'
+                    });
+                    continue;
                 }
-            }
-        }
-        for (let i = 0; i < cands.length; i++) {
-            for (let j = i + 1; j < cands.length; j++) {
-                const a = cands[i], b = cands[j];
-                const r = getResult(counts, a, b);
-                if (!r.winner) continue;
                 const from = r.winner, to = r.loser;
                 const p1 = pos[from], p2 = pos[to];
-                if (!p1 || !p2) continue;
+                const winN = from === a ? r.ca : r.cb;
+                const loseN = from === a ? r.cb : r.ca;
+                const margin = Math.max(1, winN - loseN);
                 const k = from + '>' + to;
                 const members = edgeCycles[k] || [];
                 const isHl = opts.highlightWinner && from === opts.highlightWinner;
-                if (!members.length) {
-                    const col = isHl ? '#6ee7b7' : candidateColor(from);
-                    drawArrow(ctx, p1.x, p1.y, p2.x, p2.y, col, isHl ? 5 : 3.2);
-                    continue;
+                const col = members.length
+                    ? CYCLE_PALETTE[members[0] % CYCLE_PALETTE.length]
+                    : (isHl ? '#6ee7b7' : candidateColor(from));
+                const width = 2.4 + Math.min(5, (margin / totalVoters) * 14);
+                const mid = drawArrow(ctx, p1.x, p1.y, p2.x, p2.y, col, isHl ? width + 1.2 : width, nodeR);
+                if (mid) {
+                    if (mid.head) heads.push(mid.head);
+                    const nx = -mid.uy, ny = mid.ux;
+                    labels.push({
+                        x: mid.mx + nx * 22,
+                        y: mid.my + ny * 22,
+                        text: `${from} → ${to}  ${winN}–${loseN}`,
+                        color: col
+                    });
                 }
-                const dx = p2.x - p1.x, dy = p2.y - p1.y;
-                const len = Math.sqrt(dx * dx + dy * dy) || 1;
-                const px = -dy / len, py = dx / len;
-                members.forEach((ci, m) => {
-                    const shift = (m - (members.length - 1) / 2) * 8;
-                    drawArrow(
-                        ctx,
-                        p1.x + px * shift, p1.y + py * shift,
-                        p2.x + px * shift, p2.y + py * shift,
-                        CYCLE_PALETTE[ci % CYCLE_PALETTE.length],
-                        members.length > 1 ? 2.6 : 3.4
-                    );
-                });
             }
         }
+
         for (const c of cands) {
             const p = pos[c];
             const isW = opts.highlightWinner === c;
+            const rad = isW ? nodeR + 3 : nodeR;
+            ctx.save();
+            if (isW) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, rad + 9, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(110, 231, 183, .35)';
+                ctx.lineWidth = 8;
+                ctx.stroke();
+            }
             ctx.beginPath();
-            ctx.arc(p.x, p.y, isW ? 26 : 22, 0, 2 * Math.PI);
+            ctx.arc(p.x, p.y, rad, 0, 2 * Math.PI);
+            ctx.shadowColor = 'rgba(0,0,0,.45)';
+            ctx.shadowBlur = 12;
             ctx.fillStyle = isW ? '#6ee7b7' : candidateColor(c);
             ctx.fill();
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = isW ? 4 : 3;
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(255,255,255,.92)';
+            ctx.lineWidth = isW ? 3.5 : 2.4;
             ctx.stroke();
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 16px Vazirmatn, sans-serif';
+            ctx.fillStyle = isW ? '#052016' : '#fff';
+            ctx.font = `bold ${isW ? 18 : 16}px Vazirmatn, Tahoma, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(c, p.x, p.y + 1);
+            ctx.restore();
+        }
+        heads.forEach(h => drawArrowHead(ctx, h.tipX, h.tipY, h.angle, h.size, h.color));
+        labels.forEach(lb => drawScorePill(ctx, lb.x, lb.y, lb.text, lb.color));
+        } finally {
+            canvas.__drawing = false;
         }
     }
 
@@ -415,7 +584,8 @@
         if (counts) {
             const cw = hasCondorcet(counts, cands);
             const cycles = findCycles(counts, cands);
-            if (cw) html += `<span style="color:#6ee7b7;">برنده کندورسه: ${cw}</span>`;
+            if (cw) html += `<span class="legend-win">★ برنده کندورسه: ${cw}</span>`;
+            html += '<span class="legend-hint">پیکان از برنده به بازنده: A → B یعنی A می‌برد</span>';
             cycles.forEach((cyc, i) => {
                 const col = CYCLE_PALETTE[i % CYCLE_PALETTE.length];
                 html += `<span class="cycle-chip" style="color:${col};border-color:${col};">چرخه ${cyc.concat(cyc[0]).join(' → ')}</span>`;
@@ -586,9 +756,8 @@
             return;
         }
         const rows = groupVoters(voters).map(g => {
-            const labels = parseRanking(g.rank).join(' < ');
             return `<div class="combo-row">
-                <span class="combo-rank">${escapeHtml(labels)}</span>
+                ${stackRankHtml(g.rank, 1)}
                 <strong class="combo-n">${g.n}</strong>
             </div>`;
         }).join('');
@@ -715,11 +884,16 @@
     function renderScoreBars(el, scores, cands) {
         cands = cands || Object.keys(scores || {});
         const max = Math.max(1, ...cands.map(c => scores[c] || 0));
+        const total = cands.reduce((s, c) => s + (scores[c] || 0), 0) || 1;
         el.innerHTML = cands.map(c => {
             const n = scores[c] || 0;
-            return `<div class="score-bar"><span class="candidate" style="color:${candidateColor(c)};width:24px;">${c}</span>
+            const pct = Math.round((n / total) * 100);
+            return `<div class="score-bar">
+                <span class="score-pill" style="background:${candidateColor(c)};">${c}</span>
                 <div class="bar"><span data-w="${(n / max) * 100}" style="width:0;background:${candidateColor(c)};"></span></div>
-                <strong>${n}</strong></div>`;
+                <strong>${n}</strong>
+                <span class="score-pct">${pct}٪</span>
+            </div>`;
         }).join('');
         requestAnimationFrame(() => {
             el.querySelectorAll('.bar > span[data-w]').forEach(span => {
@@ -736,9 +910,9 @@
                 const a = cands[i], b = cands[j];
                 const r = getResult(counts, a, b);
                 const label = r.winner
-                    ? `<span class="winner">${r.winner}</span> (${r.ca} در برابر ${r.cb})`
-                    : `مساوی (${r.ca} در برابر ${r.cb})`;
-                html += `<div class="pair">${a} در برابر ${b}: ${label}</div>`;
+                    ? `<span class="winner">${r.winner}</span> <span class="pair-score">${r.ca}–${r.cb}</span>`
+                    : `مساوی <span class="pair-score">${r.ca}–${r.cb}</span>`;
+                html += `<div class="pair"><span class="pair-names" style="color:${candidateColor(a)}">${a}</span> در برابر <span class="pair-names" style="color:${candidateColor(b)}">${b}</span>: ${label}</div>`;
             }
         }
         return html;
