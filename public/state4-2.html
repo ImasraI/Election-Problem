@@ -8,7 +8,8 @@
 </head>
 <body>
     <div class="container">
-        <h2 class="cond-title">معیار کندورسه (CWC)</h2>
+        <div class="section-kicker">STATE 4.2 · CWC</div>
+        <h2 class="cond-title">معیار کندورسه</h2>
         <div class="explain-panel">
             <p>برندهٔ کندورسه کسی است که در مقایسهٔ دونفره با تک‌تک رقبا پیروز شود.</p>
             <p>اگر چنین نامزدی باشد، نادیده گرفتن او غیرمنطقی است؛ سیستم باید همان را برنده اعلام کند.</p>
@@ -28,6 +29,7 @@
             <div class="card">
                 <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
                 <div class="voter-list" id="voterList"></div>
+                <div id="comboTally"></div>
             </div>
             <div class="card">
                 <div id="cmp"></div>
@@ -50,7 +52,7 @@
         const lab = M.createLab({
             candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
-            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            voterListId: 'voterList', comboTallyId: 'comboTally', unstackVoters: true, resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
             onRender(counts) {
                 const cands = lab.state.candidates;

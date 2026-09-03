@@ -32,7 +32,7 @@
     <img class="corner-logo" src="logo2.png" alt="" width="76" height="76">
     <div class="card login-card">
         <h1>ورود به کارگاه</h1>
-        <p>حساب را Admin یا Mentor می‌سازد. Voterها ثبت‌نام نمی‌کنند؛ نام و تیم را همین‌جا وارد کنید.</p>
+        <p>حساب را Admin یا Mentor می‌سازد. Voterها می‌توانند از <a href="index.html">لابی</a> با نام و گروه وارد شوند، یا اینجا با حساب وارد شوند.</p>
         <form id="loginForm">
             <label>نام کاربری</label>
             <input id="username" autocomplete="username" required>
@@ -49,7 +49,7 @@
     </div>
     <script src="workshop.js"></script>
     <script>
-        if (Workshop.token()) location.href = 'index.html';
+        if (Workshop.token()) location.href = 'workshop.html';
         fetch('/api/health').then(r => r.json()).then(h => {
             if (h && h.live === false) {
                 document.getElementById('storeWarn').textContent =
@@ -67,7 +67,7 @@
                     document.getElementById('name').value,
                     document.getElementById('team').value
                 );
-                location.href = 'index.html';
+                location.href = 'workshop.html';
             } catch (ex) {
                 err.textContent = ex.message || String(ex);
             }

@@ -8,7 +8,8 @@
 </head>
 <body>
     <div class="container">
-        <h2 class="cond-title">اجماع / پارتو (UNAN)</h2>
+        <div class="section-kicker">STATE 4.3 · UNAN</div>
+        <h2 class="cond-title">اجماع / پارتو</h2>
         <div class="explain-panel">
             <p>اگر همهٔ رأی‌دهندگان، بدون استثنا، a را به b ترجیح دهند، b نباید برنده شود.</p>
             <p>این ساده‌ترین شرط از پنج شرط است و Pareto / Unanimity نام دارد.</p>
@@ -28,6 +29,7 @@
             <div class="card">
                 <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
                 <div class="voter-list" id="voterList"></div>
+                <div id="comboTally"></div>
             </div>
             <div class="card">
                 <div id="pareto"></div>
@@ -55,7 +57,7 @@
         const lab = M.createLab({
             candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
-            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            voterListId: 'voterList', comboTallyId: 'comboTally', unstackVoters: true, resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
             highlightCondorcet: true,
             onRender(counts) {

@@ -8,11 +8,11 @@
 </head>
 <body>
     <div class="container">
-        <h2>استیت ۱ – ایده‌های کلاس</h2>
+        <div class="section-kicker">STATE 1</div>
+        <h2 class="cond-title">ایده‌های کلاس</h2>
         <div class="explain-panel">
-            <p>با سه نامزد، رأی دیگر فقط یک اسم نیست؛ هر نفر یک ترتیب کامل از بهترین تا ضعیف‌ترین می‌دهد.</p>
-            <p>نماد &lt; اولویت کیفی را نشان می‌دهد، نه نابرابری عددی.</p>
-            <p>دانستن انتخاب دوم و سوم وقتی اول حذف شود مهم است.</p>
+            <p>هر نفر یک روش رأی‌گیری پیشنهاد می‌کند — با زبان خودتان، بدون فرمول.</p>
+            <p>بعداً در استیت ۵ همین ایده‌ها با پنج شرط ارو سنجیده می‌شوند.</p>
         </div>
 
         <div class="card">
@@ -30,6 +30,7 @@
         <div class="card">
             <div class="card-header">
                 <span>فهرست روش‌های پیشنهادی همه</span>
+                <button class="outline reveal-names-btn hidden" id="revealNamesBtn" type="button">نمایش نام‌ها</button>
             </div>
             <div id="ideaList"></div>
         </div>
@@ -45,13 +46,18 @@
         const statusEl = document.getElementById('evalStatus');
         let ideas = [];
         let me = null;
+        let namesRevealed = false;
 
         function isStaff(user) {
-            return user && (user.role === 'admin' || user.role === 'owner');
+            return M.isStaffUser(user);
         }
         function canDelete(item) {
             if (!me || !item) return false;
             return isStaff(me) || item.username === me.username;
+        }
+        function showName(item) {
+            const isOwn = me && item.username === me.username;
+            return M.maskedName(item.name || item.username, namesRevealed && isStaff(me), isOwn);
         }
 
         function render() {
@@ -59,6 +65,11 @@
             const used = !!(me && me.role === 'student' && me.used_state1);
             addBtn.disabled = used;
             input.disabled = used;
+            const revealBtn = document.getElementById('revealNamesBtn');
+            if (revealBtn) {
+                revealBtn.classList.toggle('hidden', !isStaff(me));
+                revealBtn.textContent = namesRevealed ? 'مخفی کردن نام‌ها' : 'نمایش نام‌ها';
+            }
             if (used) statusEl.textContent = statusEl.textContent || 'ایده شما ثبت شده است.';
             if (!ideas.length) {
                 list.innerHTML = '<div class="empty-state">هنوز ایده‌ای ثبت نشده است.</div>';
@@ -68,7 +79,7 @@
                 <div class="idea-item">
                     <span class="badge">${i + 1}</span>
                     <div class="idea-text">
-                        <strong>${M.escapeHtml(item.name || item.username)}</strong>
+                        <strong>${showName(item)}</strong>
                         <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
                         <div>${M.escapeHtml(item.text || '')}</div>
                     </div>
@@ -123,6 +134,11 @@
                 statusEl.textContent = err.message || String(err);
             }
         }
+
+        document.getElementById('revealNamesBtn').addEventListener('click', () => {
+            namesRevealed = !namesRevealed;
+            render();
+        });
 
         Workshop.startPolling((data, changed) => {
             me = data.me;

@@ -5,10 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>استیت ۴.۵ – استقلال از گزینه‌های نامرتبط</title>
     <link rel="stylesheet" href="shared.css" />
+    <style>
+        .graph-wrap { min-height: 280px; }
+        .graph-wrap canvas { min-height: 260px; background: rgba(6, 9, 19, .35); }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="cond-title">استقلال از گزینه‌های نامرتبط (IIA)</h2>
+        <div class="section-kicker">STATE 4.5 · IIA</div>
+        <h2 class="cond-title">استقلال از گزینه‌های نامرتبط</h2>
         <div class="explain-panel">
             <p>اگر a برنده و b بازنده باشد، جابه‌جایی نامزد سوم (مثل C) نباید نتیجهٔ a در برابر b را عوض کند.</p>
             <p>مقایسهٔ دو نامزد فقط به نظر مردم دربارهٔ همان دو بستگی دارد، نه به حضور یا محبوبیت گزینهٔ نامرتبط.</p>
@@ -74,16 +79,21 @@
         ]);
 
         function paint(canvasId, legendId, barsId, tallyId, resultId, voters) {
+            const canvas = document.getElementById(canvasId);
             const counts = M.buildCounts(voters, THREE);
             const pl = M.plurality(voters, THREE);
-            M.renderRankTally(document.getElementById(tallyId), voters, THREE);
-            M.drawGraph(document.getElementById(canvasId), counts, { candidates: THREE, highlightWinner: pl.winner });
+            M.drawGraph(canvas, counts, { candidates: THREE, highlightWinner: pl.winner });
             document.getElementById(legendId).innerHTML = M.legendHtml(counts, { candidates: THREE });
             M.renderScoreBars(document.getElementById(barsId), pl.counts, THREE);
+            if (M.renderComboTally) M.renderComboTally(document.getElementById(tallyId), voters);
             document.getElementById(resultId).textContent = 'برنده: ' + (pl.winner || '—');
         }
-        paint('g1', 'l1', 'b1', 't1', 'r1', profile1);
-        paint('g2', 'l2', 'b2', 't2', 'r2', profile2);
+        function paintBoth() {
+            paint('g1', 'l1', 'b1', 't1', 'r1', profile1);
+            paint('g2', 'l2', 'b2', 't2', 'r2', profile2);
+        }
+        paintBoth();
+        requestAnimationFrame(paintBoth);
 
         const lab = M.createLab({
             candidates: THREE,
