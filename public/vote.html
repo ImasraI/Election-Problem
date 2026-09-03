@@ -10,7 +10,7 @@
     <div class="container">
         <h2>رأی‌گیری</h2>
         <div class="card">
-            <p class="text-muted">سه نامزد A، B و C را به ترتیب ترجیح خود بچینید. تا وقتی Admin یا Mentor نتیجه را نشان ندهد می‌توانید رأی را عوض کنید.</p>
+            <p class="text-muted">سه نامزد A، B و C را به ترتیب ترجیح خود بچینید. تا قبل از نمایش نتیجه می‌توانید رأی را عوض کنید. با باز شدن پنل رأی‌گیری، نمودار نتیجه خودش ظاهر می‌شود.</p>
             <div id="rankBox" style="margin-top:12px;"></div>
             <div class="row" style="margin-top:12px;">
                 <button class="primary" id="submitBtn" type="button">ثبت رأی</button>
@@ -146,6 +146,13 @@
                 ]
             };
 
+        function hideResults() {
+            resultsCard.classList.add('hidden');
+            document.getElementById('scoreBars').innerHTML = '';
+            document.getElementById('tally').innerHTML = '';
+            document.getElementById('voteCount').textContent = '۰ رأی';
+        }
+
         function isStaff(user) { return user && (user.role === 'owner' || user.role === 'admin'); }
 
         function applyVote(vote) {
@@ -224,17 +231,27 @@
 
         Workshop.startPolling((data, changed) => {
             me = data.me;
-            if (!changed) return;
             presentBtn.classList.toggle('hidden', !isStaff(me));
             if (data.my_vote && !appliedMine) {
                 applyVote(data.my_vote);
                 appliedMine = true;
             }
-            revealed = !!data.vote_revealed;
-            if (revealed) {
-                submitBtn.disabled = true;
-                showResults(data.votes || []);
+            const nowRevealed = !!data.vote_revealed;
+            if (nowRevealed) {
+                if (!revealed || changed) {
+                    revealed = true;
+                    submitBtn.disabled = true;
+                    showResults(data.votes || []);
+                }
+                return;
             }
+            if (revealed || !resultsCard.classList.contains('hidden')) {
+                hideResults();
+            }
+            revealed = false;
+            submitBtn.disabled = false;
+            presentBtn.disabled = false;
+            if (!data.my_vote) appliedMine = false;
         });
     </script>
 </body>

@@ -252,6 +252,17 @@ def vote_present(request: Request):
         return fail(exc)
 
 
+@app.post("/api/vote/reset")
+def vote_reset(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        return workshop.reset_voting(user)
+    except CATCH as exc:
+        return fail(exc)
+
+
 @app.post("/api/arrows")
 async def arrows_set(request: Request):
     user, err = require_user(request)

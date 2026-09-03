@@ -114,6 +114,7 @@
                         <input id="newPass" placeholder="رمز عبور" type="password">
                         <button class="primary" id="createUserBtn" type="button">ساخت Voter</button>
                         <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی پنل‌ها</button>
+                        <button class="outline" id="resetVoteBtn" type="button">بازنشانی رأی‌گیری</button>
                     </div>
                     <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
                     <table class="user-table" id="userTable"></table>
@@ -182,7 +183,8 @@
         let current = -1;
         let currentGroup = null;
         let me = null;
-        let unlocked = ['vote'];
+        let unlocked = [];
+        const locallyHidden = new Set();
 
         function isStaff() { return me && (me.role === 'owner' || me.role === 'admin'); }
         function isOwner() { return me && me.role === 'owner'; }
@@ -191,7 +193,17 @@
             if (role === 'admin') return 'Mentor';
             return 'Voter';
         }
-        function isUnlocked(id) { return unlocked.indexOf(id) >= 0; }
+        function isUnlocked(id) {
+            if (locallyHidden.has(id)) return false;
+            return unlocked.indexOf(id) >= 0;
+        }
+        function relatedHideIds(id) {
+            const ids = [id];
+            if (id === 's4' || id === 's6') {
+                leaves.filter(l => String(l.id).startsWith(id)).forEach(l => ids.push(l.id));
+            }
+            return ids;
+        }
         function groupUnlocked(g) {
             if (g.children) return g.children.some(c => isUnlocked(c.id)) || isUnlocked(g.id);
             return isUnlocked(g.id);
@@ -231,7 +243,7 @@
             const title = document.getElementById('adminPanelTitle');
             title.innerHTML = isOwner()
                 ? '<span dir="ltr">Admin: Mentors and Voters</span>'
-                : '<span dir="ltr">Mentor:</span> حداکثر ۶ Voter خودتان';
+                : '<span dir="ltr">Mentor:</span> Voters';
         }
 
         async function refreshUsers() {
@@ -330,6 +342,7 @@
                 btn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
                     hidePanel(btn.dataset.hide);
                 });
             });
@@ -338,9 +351,12 @@
         }
 
         async function hidePanel(id) {
+            relatedHideIds(id).forEach(item => locallyHidden.add(item));
             try {
                 const data = await Workshop.hide(id);
-                unlocked = Array.isArray(data.unlocked) ? data.unlocked.filter(x => x !== id) : unlocked.filter(x => x !== id);
+                unlocked = Array.isArray(data.unlocked)
+                    ? data.unlocked.filter(x => !locallyHidden.has(x))
+                    : unlocked.filter(x => !locallyHidden.has(x));
                 const leaf = current >= 0 ? leaves[current] : null;
                 const viewingHidden = !!(leaf && (leaf.id === id || leaf.group === id || !isUnlocked(leaf.id)));
                 const viewingGroupHidden = current < 0 && currentGroup === id;
@@ -360,6 +376,7 @@
             if (g.children) {
                 if (!isStaff() && !groupUnlocked(g)) return;
                 if (isStaff()) {
+                    locallyHidden.delete(g.id);
                     try {
                         const data = await Workshop.unlock(g.id);
                         if (data.unlocked) unlocked = data.unlocked;
@@ -380,6 +397,10 @@
             const idx = leaves.findIndex(l => l.id === id);
             if (idx < 0) return;
             if (!isStaff() && !isUnlocked(id)) return;
+            locallyHidden.delete(id);
+            if (id === 's4' || id === 's6') {
+                relatedHideIds(id).forEach(item => locallyHidden.delete(item));
+            }
             if (isStaff()) {
                 try {
                     const data = await Workshop.unlock(id);
@@ -508,6 +529,7 @@
                 : 'پنل‌های بازشده کلاس شما مخفی شوند؟ حساب‌های کاربری پاک نمی‌شوند.';
             if (!confirm(msg)) return;
             await Workshop.request('POST', '/api/admin/reset', {});
+            locallyHidden.clear();
             unlocked = ['vote'];
             showHome();
             document.getElementById('adminStatus').textContent = all
@@ -515,10 +537,23 @@
                 : 'پنل‌های کلاس شما بازنشانی شدند.';
             refreshUsers();
         });
+        document.getElementById('resetVoteBtn').addEventListener('click', async () => {
+            if (!confirm('همهٔ رأی‌ها پاک شوند و نمودار نتیجه مخفی شود؟ بعد از این همه می‌توانند دوباره رأی بدهند.')) return;
+            try {
+                await Workshop.request('POST', '/api/vote/reset', {});
+                document.getElementById('adminStatus').textContent = 'رأی‌گیری از نو شروع شد. نتیجه مخفی است و همه می‌توانند رأی بدهند.';
+                const leaf = current >= 0 ? leaves[current] : null;
+                if (leaf && leaf.id === 'vote') {
+                    iframe.src = 'vote.html';
+                }
+            } catch (err) {
+                document.getElementById('adminStatus').textContent = err.message || String(err);
+            }
+        });
 
         Workshop.startPolling((data, changed) => {
             me = data.me;
-            unlocked = Array.isArray(data.unlocked) ? data.unlocked : [];
+            unlocked = (Array.isArray(data.unlocked) ? data.unlocked : []).filter(id => !locallyHidden.has(id));
             if (!changed) return;
             renderUser();
             if (isStaff()) refreshUsers();

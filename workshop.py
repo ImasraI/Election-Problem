@@ -41,9 +41,8 @@ DATA_PATH = DATA_DIR / "workshop.json"
 STORE_KEY = "kargah:workshop"
 LOCK_KEY = "kargah:workshop:lock"
 
-MAX_STUDENTS = 120
+MAX_STUDENTS = 5000
 MAX_ADMINS = 20
-STUDENTS_PER_ADMIN = 6
 SESSION_TTL = 60 * 60 * 16
 PBKDF2_ROUNDS = 120_000
 CRITERIA_KEYS = ["AAW", "CWC", "UNAN", "MONO", "IIA"]
@@ -450,10 +449,6 @@ def create_student(actor: dict, username: str, password: str) -> dict:
         students = [u for u in data["users"].values() if u.get("role") == "student"]
         if len(students) >= MAX_STUDENTS:
             raise ValueError(f"حداکثر {MAX_STUDENTS} حساب Voter مجاز است.")
-        if is_admin(actor):
-            mine = [u for u in students if u.get("sponsor") == actor["username"]]
-            if len(mine) >= STUDENTS_PER_ADMIN:
-                raise ValueError(f"هر Mentor حداکثر {STUDENTS_PER_ADMIN} Voter دارد.")
         if username in data["users"]:
             raise ValueError("این نام کاربری قبلاً ساخته شده است.")
         data["users"][username] = {
@@ -670,9 +665,22 @@ def hide_panel(actor: dict, panel_id: str) -> list:
             for user in data["users"].values():
                 if user.get("role") == "student" and user.get("sponsor") == actor["username"]:
                     _revoke_user(user, extras)
+        if "vote" in extras:
+            _reset_vote_results(data)
         _bump(data)
         _dump(data)
         return _audience_unlocked(data, stored)
+
+
+def _reset_vote_results(data: dict) -> None:
+    data["vote_revealed"] = False
+    data["vote_display"] = []
+
+
+def _reveal_vote_results(data: dict) -> None:
+    if not data.get("vote_display"):
+        data["vote_display"] = _fake_display_votes(data.get("votes") or {})
+    data["vote_revealed"] = True
 
 
 def set_vote(user: dict, rank: str) -> dict:
@@ -700,12 +708,22 @@ def present_votes(actor: dict) -> dict:
         raise PermissionError("فقط Mentor یا Admin می‌تواند نتیجه را نشان بدهد.")
     with _lock:
         data = _load()
-        if not data.get("vote_display"):
-            data["vote_display"] = _fake_display_votes(data.get("votes") or {})
-        data["vote_revealed"] = True
+        _reveal_vote_results(data)
         _bump(data)
         _dump(data)
         return {"vote_revealed": True, "votes": list(data["vote_display"])}
+
+
+def reset_voting(actor: dict) -> dict:
+    if not is_staff(actor):
+        raise PermissionError("فقط Mentor یا Admin می‌تواند رأی‌گیری را از نو شروع کند.")
+    with _lock:
+        data = _load()
+        data["votes"] = {}
+        _reset_vote_results(data)
+        _bump(data)
+        _dump(data)
+        return {"vote_revealed": False, "votes": []}
 
 
 def set_arrows(admin: dict, profiles) -> list:
@@ -1028,11 +1046,10 @@ def reset_workshop(actor: dict) -> None:
     with _lock:
         data = _load()
         reset_all = is_owner(actor) or actor.get("username") == "admin"
+        _reset_vote_results(data)
         if reset_all:
             data["unlocked"] = ["vote"]
             data["hidden"] = []
-            data["vote_revealed"] = False
-            data["vote_display"] = []
             for user in data["users"].values():
                 if user.get("role") == "student":
                     user["unlocked"] = ["vote"]
