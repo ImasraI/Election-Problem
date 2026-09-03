@@ -99,6 +99,17 @@
 
         <div class="card admin-panel hidden" id="adminPanel">
             <div class="fold">
+                <button class="fold-toggle" id="toggleLobby" type="button" aria-expanded="false">
+                    <span>لابی — شرکت‌کنندگان در انتظار</span>
+                    <span class="fold-caret">▸</span>
+                </button>
+                <div class="fold-body hidden" id="lobbyBody">
+                    <p class="text-muted" style="margin-bottom:10px;">شرکت‌کنندگانی که از <a href="lobby.html" target="_blank">لابی</a> وارد شده‌اند. آن‌ها را به کلاس دعوت کنید یا حذف کنید.</p>
+                    <div id="lobbyList"></div>
+                    <div id="lobbyStatus" class="text-muted" style="margin-top:8px;"></div>
+                </div>
+            </div>
+            <div class="fold">
                 <button class="fold-toggle" id="toggleAccounts" type="button" aria-expanded="false">
                     <span id="adminPanelTitle">حساب‌ها</span>
                     <span class="fold-caret">▸</span>
@@ -184,6 +195,7 @@
         let currentGroup = null;
         let me = null;
         let unlocked = [];
+        let lobby = [];
         const locallyHidden = new Set();
 
         function isStaff() { return me && (me.role === 'owner' || me.role === 'admin'); }
@@ -244,6 +256,56 @@
             title.innerHTML = isOwner()
                 ? '<span dir="ltr">Admin: Mentors and Voters</span>'
                 : '<span dir="ltr">Mentor:</span> Voters';
+        }
+
+        async function refreshLobby() {
+            if (!isStaff()) return;
+            const list = document.getElementById('lobbyList');
+            if (!lobby.length) {
+                list.innerHTML = '<div class="empty-state">لابی خالی است.</div>';
+                return;
+            }
+            list.innerHTML = lobby.map(entry => `
+                <div class="lobby-row">
+                    <div class="lobby-who">
+                        <strong>${escapeHtml(entry.name)}</strong>
+                        <span class="text-muted"> · گروه ${escapeHtml(entry.group)}</span>
+                    </div>
+                    <div class="lobby-actions">
+                        <button class="primary lobby-pull" type="button" data-id="${escapeHtml(entry.id)}">دعوت به کلاس</button>
+                        <button class="outline lobby-remove" type="button" data-id="${escapeHtml(entry.id)}">حذف</button>
+                    </div>
+                </div>`).join('');
+            list.querySelectorAll('.lobby-pull').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const status = document.getElementById('lobbyStatus');
+                    status.textContent = 'در حال دعوت…';
+                    try {
+                        await Workshop.request('POST', '/api/lobby/pull', { id: btn.dataset.id });
+                        status.textContent = 'شرکت‌کننده به کلاس اضافه شد.';
+                        refreshUsers();
+                    } catch (err) {
+                        status.textContent = err.message || String(err);
+                    }
+                });
+            });
+            list.querySelectorAll('.lobby-remove').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const status = document.getElementById('lobbyStatus');
+                    try {
+                        await Workshop.request('POST', '/api/lobby/remove', { id: btn.dataset.id });
+                        status.textContent = 'از لابی حذف شد.';
+                    } catch (err) {
+                        status.textContent = err.message || String(err);
+                    }
+                });
+            });
+        }
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         async function refreshUsers() {
@@ -525,8 +587,8 @@
         document.getElementById('resetWorkshopBtn').addEventListener('click', async () => {
             const all = isOwner();
             const msg = all
-                ? 'پنل‌های بازشده برای همه کلاس‌ها مخفی شوند؟ حساب‌های کاربری پاک نمی‌شوند.'
-                : 'پنل‌های بازشده کلاس شما مخفی شوند؟ حساب‌های کاربری پاک نمی‌شوند.';
+                ? 'پنل‌های بازشده برای همه کلاس‌ها مخفی شوند؟ حساب‌های Mentor و Voter پاک نمی‌شوند.'
+                : 'پنل‌های بازشده کلاس شما مخفی شوند؟ حساب‌های Voter پاک نمی‌شوند.';
             if (!confirm(msg)) return;
             await Workshop.request('POST', '/api/admin/reset', {});
             locallyHidden.clear();
@@ -554,9 +616,13 @@
         Workshop.startPolling((data, changed) => {
             me = data.me;
             unlocked = (Array.isArray(data.unlocked) ? data.unlocked : []).filter(id => !locallyHidden.has(id));
+            lobby = Array.isArray(data.lobby) ? data.lobby : [];
+            if (isStaff()) {
+                refreshLobby();
+                if (changed) refreshUsers();
+            }
             if (!changed) return;
             renderUser();
-            if (isStaff()) refreshUsers();
             if (current >= 0 && !isStaff() && leaves[current] && !isUnlocked(leaves[current].id)) {
                 showHome();
             } else {
@@ -574,6 +640,7 @@
             });
         }
         bindFold('toggleAccounts', 'accountsBody');
+        bindFold('toggleLobby', 'lobbyBody');
         bindFold('togglePoints', 'pointsBoard');
     </script>
 </body>

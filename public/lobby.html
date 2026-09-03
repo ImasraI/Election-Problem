@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa" data-public-page="1">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>لابی کارگاه</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+        body { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
+        .lobby-card { width: min(440px, 100%); }
+        .lobby-card h1 { font-size: 24px; margin-bottom: 8px; }
+        .lobby-card p { color: var(--c-muted); margin-bottom: 18px; line-height: 1.7; }
+        .lobby-card label { display: block; font-size: 13px; font-weight: 700; margin: 12px 0 6px; }
+        .lobby-card input { width: 100%; padding: 10px 12px; }
+        .lobby-card button { width: 100%; justify-content: center; margin-top: 18px; padding: 12px; }
+        .err { color: var(--c-rose); min-height: 1.4em; margin-top: 10px; font-size: 13px; }
+        .waiting-screen { text-align: center; }
+        .waiting-screen .pulse {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: rgba(57, 211, 255, .15);
+            border: 2px solid rgba(57, 211, 255, .4);
+            margin: 24px auto;
+            animation: lobbyPulse 1.8s ease-in-out infinite;
+        }
+        @keyframes lobbyPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(57,211,255,0); }
+            50% { transform: scale(1.08); box-shadow: 0 0 24px rgba(57,211,255,.35); }
+        }
+        .waiting-screen h2 { font-size: 20px; margin-bottom: 8px; }
+        .waiting-screen .who { color: var(--c-cyan-light); font-weight: 700; }
+        .staff-link { display: block; text-align: center; margin-top: 16px; font-size: 13px; color: var(--c-muted); }
+        .staff-link a { color: var(--c-cyan-light); }
+    </style>
+</head>
+<body>
+    <img class="corner-logo" src="logo2.png" alt="" width="76" height="76">
+    <div class="card lobby-card" id="joinCard">
+        <h1>ورود به لابی</h1>
+        <p>نام و گروه خود را وارد کنید. Mentor شما را به کلاس دعوت می‌کند.</p>
+        <form id="joinForm">
+            <label>نام شما</label>
+            <input id="name" autocomplete="name" required placeholder="مثلاً: علی">
+            <label>گروه / تیم</label>
+            <input id="group" required placeholder="مثلاً: گروه ۱">
+            <div class="err" id="err"></div>
+            <button class="primary" type="submit">ورود به لابی</button>
+        </form>
+        <span class="staff-link">Mentor یا Admin هستید؟ <a href="login.html">ورود با حساب</a></span>
+    </div>
+
+    <div class="card lobby-card waiting-screen hidden" id="waitCard">
+        <div class="pulse"></div>
+        <h2>در انتظار Mentor…</h2>
+        <p>سلام <span class="who" id="waitName"></span> · گروه <span class="who" id="waitGroup"></span></p>
+        <p class="text-muted" style="margin-top:12px;">Mentor شما را به کلاس دعوت می‌کند. این صفحه را باز نگه دارید.</p>
+        <div class="err" id="waitErr"></div>
+    </div>
+
+    <script src="workshop.js"></script>
+    <script>
+        const LOBBY_TOKEN_KEY = 'lobby-token';
+        const joinCard = document.getElementById('joinCard');
+        const waitCard = document.getElementById('waitCard');
+        const errEl = document.getElementById('err');
+        const waitErr = document.getElementById('waitErr');
+        let pollTimer = null;
+
+        function showWaiting(entry) {
+            joinCard.classList.add('hidden');
+            waitCard.classList.remove('hidden');
+            document.getElementById('waitName').textContent = entry.name || '';
+            document.getElementById('waitGroup').textContent = entry.group || '';
+        }
+
+        async function pollStatus(token) {
+            try {
+                const res = await fetch('/api/lobby/status?token=' + encodeURIComponent(token));
+                const data = await res.json();
+                if (data.status === 'pulled' && data.token) {
+                    clearInterval(pollTimer);
+                    localStorage.setItem('workshop-token', data.token);
+                    localStorage.removeItem(LOBBY_TOKEN_KEY);
+                    location.href = 'index.html';
+                    return;
+                }
+                if (data.status === 'removed') {
+                    clearInterval(pollTimer);
+                    localStorage.removeItem(LOBBY_TOKEN_KEY);
+                    waitCard.classList.add('hidden');
+                    joinCard.classList.remove('hidden');
+                    errEl.textContent = 'از لابی حذف شدید. دوباره وارد شوید.';
+                    return;
+                }
+                if (data.status === 'waiting' && data.entry) {
+                    showWaiting(data.entry);
+                }
+            } catch (e) {
+                waitErr.textContent = 'اتصال قطع شد. در حال تلاش مجدد…';
+            }
+        }
+
+        document.getElementById('joinForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errEl.textContent = '';
+            const name = document.getElementById('name').value.trim();
+            const group = document.getElementById('group').value.trim();
+            if (!name || !group) {
+                errEl.textContent = 'نام و گروه را وارد کنید.';
+                return;
+            }
+            try {
+                const res = await fetch('/api/lobby/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, group })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'خطا');
+                localStorage.setItem(LOBBY_TOKEN_KEY, data.token);
+                showWaiting(data.entry);
+                pollTimer = setInterval(() => pollStatus(data.token), 3000);
+                pollStatus(data.token);
+            } catch (ex) {
+                errEl.textContent = ex.message || String(ex);
+            }
+        });
+
+        // Resume waiting if already in lobby
+        const saved = localStorage.getItem(LOBBY_TOKEN_KEY);
+        if (Workshop.token()) {
+            location.href = 'index.html';
+        } else if (saved) {
+            pollStatus(saved).then(() => {
+                pollTimer = setInterval(() => pollStatus(saved), 3000);
+            });
+        }
+    </script>
+</body>
+</html>

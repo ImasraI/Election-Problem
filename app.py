@@ -216,6 +216,62 @@ async def ideas_delete(request: Request):
         return fail(exc)
 
 
+@app.post("/api/lobby/join")
+async def lobby_join(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    try:
+        return workshop.join_lobby(body.get("name") or "", body.get("group") or "")
+    except ValueError as exc:
+        return fail(exc)
+
+
+@app.get("/api/lobby/status")
+def lobby_status(request: Request):
+    token = request.query_params.get("token") or ""
+    try:
+        return workshop.lobby_snapshot(token)
+    except ValueError as exc:
+        return fail(exc)
+
+
+@app.get("/api/lobby")
+def lobby_list(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        return {"lobby": workshop.list_lobby(user)}
+    except CATCH as exc:
+        return fail(exc)
+
+
+@app.post("/api/lobby/pull")
+async def lobby_pull(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        return workshop.pull_from_lobby(user, body.get("id") or "")
+    except CATCH as exc:
+        return fail(exc)
+
+
+@app.post("/api/lobby/remove")
+async def lobby_remove(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        return workshop.remove_from_lobby(user, body.get("id") or "")
+    except CATCH as exc:
+        return fail(exc)
+
+
 @app.post("/api/admin/reset")
 def admin_reset(request: Request):
     user, err = require_user(request)

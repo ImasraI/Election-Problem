@@ -1,8 +1,6 @@
 /* shared voting helpers + drag ranking widget */
 (function (global) {
-    const CANDIDATES = ['A', 'B', 'C'];
-    const MAX_VOTERS = 6;
-    const RANK3 = ['A>B>C', 'A>C>B', 'B>A>C', 'B>C>A', 'C>A>B', 'C>B>A'];
+    const CANDIDATES = ['A', 'B', 'C', 'D', 'E'];
     const NAME_POOL = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'.split('');
     const COLOR_LIST = [
         '#d45d5d', '#3d8c7a', '#3b7fa8', '#c9842a', '#7c5cbf',
@@ -37,32 +35,20 @@
         return out;
     }
     function cyclicVoters(cands) {
-        cands = (cands || CANDIDATES).slice(0, MAX_VOTERS);
-        if (cands.length <= 3) {
-            return expandGroups([
-                { n: 2, rank: 'A>B>C' },
-                { n: 2, rank: 'B>C>A' },
-                { n: 2, rank: 'C>A>B' }
-            ]);
-        }
+        cands = cands || CANDIDATES;
         return cands.map((_, i) => cands.slice(i).concat(cands.slice(0, i)).join('>'));
     }
     function condorcetWinnerVoters(cands, winner) {
         cands = (cands || CANDIDATES).slice();
         winner = winner || cands[0];
         const rest = cands.filter(c => c !== winner);
+        const voters = [];
         const top = [winner].concat(rest).join('>');
-        if (!rest.length) return [top];
-        const second = [rest[0], winner].concat(rest.slice(1)).join('>');
-        if (rest.length === 1) {
-            return expandGroups([{ n: 4, rank: top }, { n: 2, rank: second }]);
-        }
-        const third = [rest[1], winner].concat(rest.filter(x => x !== rest[1])).join('>');
-        return expandGroups([
-            { n: 3, rank: top },
-            { n: 2, rank: second },
-            { n: 1, rank: third }
-        ]);
+        for (let i = 0; i < rest.length + 2; i++) voters.push(top);
+        rest.forEach(r => {
+            voters.push([r, winner].concat(rest.filter(x => x !== r)).join('>'));
+        });
+        return voters;
     }
     function emptyCounts(cands) {
         const counts = {};
@@ -440,64 +426,6 @@
         return parseRanking(str).join(' ≻ ');
     }
 
-    function stackRankHtml(rank) {
-        const parts = parseRanking(rank);
-        return parts.map((c, i) => {
-            const letter = `<span class="rank-letter" style="color:${candidateColor(c)}">${c}</span>`;
-            const arrow = i < parts.length - 1 ? '<span class="rank-lt">&lt;</span>' : '';
-            return letter + arrow;
-        }).join('');
-    }
-
-    function groupVoters(voters) {
-        const groups = [];
-        const at = {};
-        (voters || []).forEach((rank, i) => {
-            const key = parseRanking(rank).join('>');
-            if (at[key] === undefined) {
-                at[key] = groups.length;
-                groups.push({ rank: key, indices: [i], n: 1 });
-            } else {
-                groups[at[key]].indices.push(i);
-                groups[at[key]].n += 1;
-            }
-        });
-        return groups;
-    }
-
-    function tallyRanks(voters, cands) {
-        cands = cands || CANDIDATES;
-        const tally = {};
-        const keys = cands.length === 3 ? RANK3.slice() : [];
-        keys.forEach(k => { tally[k] = 0; });
-        (voters || []).forEach(rank => {
-            const key = parseRanking(rank).filter(c => cands.includes(c)).join('>');
-            if (!key) return;
-            if (tally[key] === undefined) tally[key] = 0;
-            tally[key] += 1;
-        });
-        const order = keys.length ? keys : Object.keys(tally);
-        return { tally, order };
-    }
-
-    function ballotChip(n, rank) {
-        return `<span class="ballot-chip"><span class="rank-arrow">${stackRankHtml(rank)}</span><b>${n}</b></span>`;
-    }
-
-    function renderRankTally(el, voters, cands) {
-        if (!el) return;
-        cands = cands || CANDIDATES;
-        const { tally, order } = tallyRanks(voters, cands);
-        const cols = order.map(key => {
-            const n = tally[key] || 0;
-            return `<div class="rank-col">
-                <div class="rank-arrow">${stackRankHtml(key)}</div>
-                <div class="rank-count">${n}</div>
-            </div>`;
-        }).join('');
-        el.innerHTML = `<div class="rank-tally">${cols}</div>`;
-    }
-
     function RankingWidget(el, options) {
         options = options || {};
         this.el = typeof el === 'string' ? document.getElementById(el) : el;
@@ -536,7 +464,7 @@
                 <div class="rank-slot" draggable="true" data-idx="${i}" aria-label="رتبه ${i + 1}: نامزد ${c}">
                     <span class="grip" aria-hidden="true">⋮⋮</span>
                     <span class="rank-num">${i + 1}</span>
-                    <span class="cand-chip" style="background:${candidateColor(c)};">${c}</span>
+                    <span class="cand-chip chip-${c}" style="background:${candidateColor(c)};">${c}</span>
                     <span class="cand-label">نامزد ${c} — ${tag}</span>
                     <span class="move-btns">
                         <button type="button" data-act="up" data-idx="${i}" ${i === 0 ? 'disabled' : ''} aria-label="بالاتر بردن ${c}">▲</button>
@@ -591,7 +519,7 @@
                 <div id="${el.id}-rank" style="flex:1;"></div>
                 <div class="adder-controls">
                     <label>تعداد رأی با این ترتیب
-                        <input type="number" id="${el.id}-qty" min="1" max="${MAX_VOTERS}" value="1">
+                        <input type="number" id="${el.id}-qty" min="1" max="99" value="1">
                     </label>
                     <button class="primary" id="${el.id}-add" type="button">${addLabel}</button>
                     ${options.extraButtons || ''}
@@ -615,8 +543,8 @@
         if (!el) return;
         el.innerHTML = `
             <div class="cand-bar">
-                ${cands.map(c => `<span class="cand-pill" style="background:${candidateColor(c)};">${c}</span>`).join('')}
-                <button type="button" class="outline" data-act="add" ${cands.length >= 6 ? 'disabled' : ''}>+ نامزد</button>
+                ${cands.map(c => `<span class="cand-pill chip-${c}" style="background:${candidateColor(c)};">${c}</span>`).join('')}
+                <button type="button" class="outline" data-act="add" ${cands.length >= 10 ? 'disabled' : ''}>+ نامزد</button>
                 <button type="button" class="outline" data-act="remove" ${cands.length <= 3 ? 'disabled' : ''}>حذف آخرین</button>
             </div>`;
         el.querySelector('[data-act="add"]').addEventListener('click', () => handlers.onAdd && handlers.onAdd());
@@ -629,24 +557,19 @@
             container.innerHTML = `<div class="empty-state">هنوز رأی‌دهنده‌ای اضافه نشده است.</div>`;
             return;
         }
-        const groups = groupVoters(voters);
-        let html = '<div class="voter-stacks">';
-        groups.forEach((g, gi) => {
-            const marked = extra.markIndex != null && g.indices.indexOf(extra.markIndex) >= 0;
-            const idx = g.indices[g.indices.length - 1];
+        let html = '';
+        voters.forEach((rank, i) => {
+            const mark = extra.markIndex === i ? ' style="border-color:#f9b44a;background:rgba(249,180,74,.12);"' : '';
             html += `
-                <div class="voter-stack${marked ? ' marked' : ''}">
-                    <div class="rank-arrow">${stackRankHtml(g.rank)}</div>
-                    <div class="rank-count">${g.n}</div>
-                    ${marked ? '<div class="highlight-up">دیکتاتور</div>' : ''}
-                    <span class="stack-actions">
-                        ${extra.onEdit ? `<button type="button" class="outline edit-btn" data-idx="${g.indices[0]}">ویرایش</button>` : ''}
-                        ${extra.onPick ? `<button type="button" class="outline pick-btn" data-idx="${g.indices[0]}">انتخاب</button>` : ''}
-                        <button class="remove-btn" data-idx="${idx}" type="button">✕</button>
+                <div class="voter-item"${mark}>
+                    <span class="rank">#${i + 1} &nbsp; ${formatRank(rank)}${extra.markIndex === i ? ' <span class="highlight-up">دیکتاتور</span>' : ''}</span>
+                    <span style="display:flex;gap:4px;">
+                        ${extra.onEdit ? `<button type="button" class="outline edit-btn" data-idx="${i}">ویرایش</button>` : ''}
+                        ${extra.onPick ? `<button type="button" class="outline pick-btn" data-idx="${i}">انتخاب</button>` : ''}
+                        <button class="remove-btn" data-idx="${i}" type="button">✕</button>
                     </span>
                 </div>`;
         });
-        html += '</div>';
         container.innerHTML = html;
         container.querySelectorAll('.remove-btn').forEach(btn => {
             btn.addEventListener('click', () => onRemove(parseInt(btn.dataset.idx, 10)));
@@ -777,9 +700,7 @@
                         st.voters[st.editing] = rank;
                         st.editing = -1;
                     } else {
-                        const room = MAX_VOTERS - st.voters.length;
-                        const add = Math.min(Math.max(1, n), Math.max(0, room));
-                        for (let i = 0; i < add; i++) st.voters.push(rank);
+                        for (let i = 0; i < n; i++) st.voters.push(rank);
                     }
                     render();
                 }
@@ -796,13 +717,11 @@
             if (opts.candidateBarId) {
                 renderCandidateBar(document.getElementById(opts.candidateBarId), st.candidates, {
                     onAdd() {
-                        if (opts.keepParadox && st.candidates.length >= MAX_VOTERS) return;
                         const nxt = nextCandidate(st.candidates);
                         if (!nxt) return;
                         st.candidates.push(nxt);
                         if (opts.keepParadox) st.voters = cyclicVoters(st.candidates);
                         else st.voters = appendCandidateToVoters(st.voters, nxt);
-                        if (st.voters.length > MAX_VOTERS) st.voters = st.voters.slice(0, MAX_VOTERS);
                         if (opts.stepwise) st.stepIndex = st.voters.length;
                         remount();
                         render();
@@ -898,7 +817,7 @@
             remount,
             countsNow,
             setVoters(v, process) {
-                st.voters = (v || []).slice(0, MAX_VOTERS);
+                st.voters = v.slice();
                 st.stepIndex = process || !opts.stepwise ? st.voters.length : 0;
                 st.editing = -1;
                 remount();
@@ -992,6 +911,23 @@
             .replace(/"/g, '&quot;');
     }
 
+    function isStaffUser(user) {
+        return user && (user.role === 'admin' || user.role === 'owner');
+    }
+
+    function maskedName(name, revealed, isOwn) {
+        if (isOwn || revealed) return escapeHtml(name || '');
+        return '<span class="masked-name">●●●●</span>';
+    }
+
+    function ballotChip(n, rank) {
+        const parts = parseRanking(rank);
+        const letters = parts.map(c =>
+            `<span class="ballot-letter ballot-${c}">${c}</span>`
+        ).join('<span class="ballot-sep">≻</span>');
+        return `<span class="ballot-group"><span class="ballot-qty">${n}×</span>${letters}</span>`;
+    }
+
     function loadIdeas() {
         try { return JSON.parse(localStorage.getItem(IDEA_KEY) || '[]'); } catch (e) { return []; }
     }
@@ -1019,7 +955,7 @@
                 <div class="chart-title" style="margin:16px 0 8px;">مثال‌هایی که این روش را رد می‌کنند</div>
                 ${examples.map((ex, i) => {
                     const meta = byRule[ex.rule] || { name: ex.rule, title: '' };
-                    const ballots = (ex.ballots || []).map(b => `<li>${b}</li>`).join('');
+                    const ballots = (ex.ballots || []).map(b => `<li>${escapeHtml(b)}</li>`).join('');
                     return `<div class="violation-demo counterexample-card">
                         <div class="title">${i + 1}. ${escapeHtml(meta.name)} — ${escapeHtml(ex.title || meta.title)}</div>
                         ${ballots ? `<ul class="plain">${ballots}</ul>` : ''}
@@ -1058,15 +994,15 @@
     }
 
     global.Mentor = {
-        CANDIDATES, MAX_VOTERS, RANK3, COLORS, CRITERIA, IDEA_KEY, CYCLE_PALETTE,
+        CANDIDATES, COLORS, CRITERIA, IDEA_KEY, CYCLE_PALETTE,
         candidateColor, nextCandidate, parseRanking, pairKey, buildCounts, getResult, getWins,
         rankingByWins, hasCondorcet, hasCycle, findCycles,
         plurality, borda, hare, sequential, dictator, condorcetMethod,
         firstChoices, unanimityHold, expandGroups, cyclicVoters, condorcetWinnerVoters,
-        drawGraph, legendHtml, formatRank, stackRankHtml, groupVoters, tallyRanks, renderRankTally, ballotChip, layoutPositions,
+        drawGraph, legendHtml, formatRank, layoutPositions,
         RankingWidget, mountVoterAdder, renderVoterList, renderMatrix, renderMatrixTable,
         renderWinRanking, renderScoreBars, renderCandidateBar, pairTallyHtml, createLab,
         evaluateSystem, fetchExamples, renderCriteriaChart, checkBackend,
-        loadIdeas, saveIdeas, escapeHtml
+        loadIdeas, saveIdeas, escapeHtml, isStaffUser, maskedName, ballotChip
     };
 })(window);
