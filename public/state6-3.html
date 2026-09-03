@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2 class="cond-title">روش بوردا</h2>
+        <div class="explain-panel">
+            <p>هر نفر همهٔ نامزدها را رتبه‌بندی می‌کند؛ جایگاه اول n−۱ امتیاز می‌گیرد تا آخر که صفر است.</p>
+            <p>مجموع امتیاز همهٔ برگه‌ها برنده را مشخص می‌کند. برخلاف اکثریت، کل فهرست ترجیح به حساب می‌آید.</p>
+            <p>همیشه برنده دارد، اما ممکن است برندهٔ کندورسه امتیاز کمتری بگیرد و جابه‌جایی C امتیاز A و B را عوض کند.</p>
+        </div>
         <div id="chart"></div>
         <div class="card">
             <div id="candBar"></div>
@@ -35,25 +40,35 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const FIVE = ['A','B','C','D','E'];
+        const THREE = ['A', 'B', 'C'];
         const EXAMPLE = M.expandGroups([
-            { n: 3, rank: 'A>B>C>D>E' },
-            { n: 3, rank: 'B>C>D>E>A' },
-            { n: 2, rank: 'C>B>A>D>E' },
-            { n: 1, rank: 'D>E>B>C>A' },
-            { n: 1, rank: 'E>D>B>C>A' }
+            { n: 2, rank: 'A>B>C' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>B>A' }
         ]);
         M.renderCriteriaChart(document.getElementById('chart'), {
             AAW: true, CWC: false, UNAN: true, MONO: true, IIA: false
         }, {
             title: 'نمودار ازپیش‌آماده‌شده',
             examples: [
-                { rule: 'CWC', title: 'امتیاز رتبه با پیروزی دونفره یکی نیست', ballots: ['چند گروه A را اول می‌گذارند', 'بقیه B را در رتبه‌های بالا پخش می‌کنند'], result: 'بوردا ممکن است B را برنده کند در حالی که C همه را دونفره می‌برد.', why: 'جمع امتیاز، معیار کندورسه را تضمین نمی‌کند.' },
-                { rule: 'IIA', title: 'جابه‌جایی C امتیاز A و B را عوض می‌کند', ballots: ['A در برابر B در همه برگه‌ها ثابت است', 'رتبه C عوض می‌شود'], result: 'برنده از A به B می‌چرخد.', why: 'امتیازها به تعداد و جای نامزد سوم وابسته‌اند.' }
+                {
+                    rule: 'CWC',
+                    title: 'امتیاز رتبه با پیروزی دونفره یکی نیست',
+                    ballots: [M.ballotChip(2, 'A>B>C'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>B>A')],
+                    result: 'کندورسه C است. بوردا امتیاز B را بالاتر می‌برد چون B در برگه‌ها وسط یا اول است.',
+                    why: 'جمع امتیاز، معیار کندورسه را تضمین نمی‌کند.'
+                },
+                {
+                    rule: 'IIA',
+                    title: 'جابه‌جایی C امتیاز A و B را عوض می‌کند',
+                    ballots: [M.ballotChip(3, 'A>B>C') + M.ballotChip(3, 'B>A>C'), M.ballotChip(3, 'A>C>B') + M.ballotChip(3, 'B>C>A')],
+                    result: 'A در برابر B در همهٔ برگه‌ها ثابت است؛ فقط جای C عوض شده و ترتیب امتیاز عوض می‌شود.',
+                    why: 'امتیازها به جای نامزد سوم وابسته‌اند.'
+                }
             ]
         });
         const lab = M.createLab({
-            candidates: FIVE,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
@@ -69,7 +84,7 @@
                     (cw && cw !== br.winner ? `<div class="result-box loss">برنده کندورسه ${cw} بود.</div>` : '');
             }
         });
-        document.getElementById('loadEx').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(EXAMPLE, true); });
+        document.getElementById('loadEx').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(EXAMPLE, true); });
         lab.setVoters(EXAMPLE, true);
     </script>
 </body>

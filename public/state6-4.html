@@ -9,13 +9,18 @@
 <body>
     <div class="container">
         <h2 class="cond-title">روش حذف تدریجی (هر)</h2>
+        <div class="explain-panel">
+            <p>در هر دور فقط رأی اول شمرده می‌شود؛ کم‌رأی‌ترین حذف می‌شود و رأی‌هایش به انتخاب بعدی منتقل می‌گردد.</p>
+            <p>این کار تا ماندن یک نامزد ادامه دارد. همیشه برنده دارد.</p>
+            <p>ممکن است بالا بردن یک نامزد مسیر حذف را عوض کند و همان نامزد ببازد؛ یکنوایی نقض می‌شود.</p>
+        </div>
         <div id="chart"></div>
         <div class="card">
             <div id="candBar"></div>
             <div id="adder"></div>
             <div class="row" style="margin-top:10px;">
-                <button class="outline" id="beforeBtn" type="button">قبل از بالا بردن A</button>
-                <button class="outline" id="afterBtn" type="button">بعد از بالا بردن A</button>
+                <button class="outline" id="beforeBtn" type="button">قبل</button>
+                <button class="outline" id="afterBtn" type="button">بعد — یک رأی B به A</button>
                 <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
             </div>
             <div class="grid-2" style="margin-top:12px;">
@@ -37,25 +42,36 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const SEVEN = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+        const THREE = ['A', 'B', 'C'];
         const before = M.expandGroups([
-            { n: 5, rank: 'A>B>C>D>E>F>G' },
-            { n: 6, rank: 'B>C>A>D>E>F>G' },
-            { n: 4, rank: 'C>A>B>D>E>F>G' }
+            { n: 2, rank: 'A>B>C' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
         ]);
         const after = M.expandGroups([
-            { n: 7, rank: 'A>B>C>D>E>F>G' },
-            { n: 4, rank: 'B>C>A>D>E>F>G' },
-            { n: 4, rank: 'C>A>B>D>E>F>G' }
+            { n: 3, rank: 'A>B>C' },
+            { n: 1, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
         ]);
         M.renderCriteriaChart(document.getElementById('chart'), {
             AAW: true, CWC: false, UNAN: true, MONO: false, IIA: false
         }, {
             title: 'نمودار ازپیش‌آماده‌شده',
             examples: [
-                { rule: 'MONO', title: 'بالا بردن A باعث باخت A می‌شود', ballots: ['قبل: A برنده است', 'بعد: دو نفر A را بالاتر می‌گذارند و C برنده می‌شود'], result: 'وضعیت A بهتر شد، جایگاه نهایی‌اش بدتر شد.', why: 'یکنوایی نقض می‌شود.' },
-                { rule: 'CWC', title: 'ممکن است برنده کندورسه حذف شود', ballots: ['نامزدی که دونفره همه را می‌برد، رأی اول کمی دارد'], result: 'زود کنار می‌رود.', why: 'معیار کندورسه تضمین نیست.' },
-                { rule: 'IIA', title: 'نامزد سوم مسیر حذف را عوض می‌کند', ballots: ['A در برابر B ثابت', 'جای C عوض می‌شود'], result: 'برنده نهایی عوض می‌شود.', why: 'استقلال نقض می‌شود.' }
+                {
+                    rule: 'MONO',
+                    title: 'یک رأی از B به A مسیر حذف را عوض می‌کند',
+                    ballots: [M.ballotChip(2, 'A>B>C') + M.ballotChip(2, 'B>C>A') + M.ballotChip(2, 'C>A>B'), M.ballotChip(3, 'A>B>C') + M.ballotChip(1, 'B>C>A') + M.ballotChip(2, 'C>A>B')],
+                    result: 'قبل با تساوی سه‌طرفه A حذف می‌شود و B می‌ماند. بعد B حذف می‌شود و C می‌ماند.',
+                    why: 'تغییر به نفع A، برنده را از B به C برد؛ یکنوایی نقض می‌شود.'
+                },
+                {
+                    rule: 'CWC',
+                    title: 'برنده کندورسه ممکن است زود حذف شود',
+                    ballots: [M.ballotChip(2, 'A>C>B'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>B>A')],
+                    result: 'C همه را دونفره می‌برد اما رأی اولش با بقیه برابر است و ممکن است مسیر حذف او را کنار بگذارد.',
+                    why: 'معیار کندورسه تضمین نیست.'
+                }
             ]
         });
         function roundsHtml(hr) {
@@ -74,7 +90,7 @@
             }).join('');
         }
         const lab = M.createLab({
-            candidates: SEVEN,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
@@ -95,8 +111,8 @@
                 roundsEl.innerHTML = roundsHtml(hr);
             }
         });
-        document.getElementById('beforeBtn').addEventListener('click', () => { lab.setCandidates(SEVEN); lab.setVoters(before, true); });
-        document.getElementById('afterBtn').addEventListener('click', () => { lab.setCandidates(SEVEN); lab.setVoters(after, true); });
+        document.getElementById('beforeBtn').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(before, true); });
+        document.getElementById('afterBtn').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(after, true); });
         lab.setVoters(before, true);
     </script>
 </body>

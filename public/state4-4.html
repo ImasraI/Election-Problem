@@ -9,29 +9,26 @@
 <body>
     <div class="container">
         <h2 class="cond-title">یکنوایی (Monotonicity)</h2>
+        <div class="explain-panel">
+            <p>اگر a برنده باشد و فقط جایگاهش نزد بعضی رأی‌دهندگان بهتر شود — بدون عوض شدن ترتیب بقیه — باید همچنان برنده بماند.</p>
+            <p>«حمایت بیشتر» هرگز نباید نتیجه را برعکس کند. این ویژگی Monotonicity است.</p>
+            <p>روش حذف تدریجی می‌تواند همین شرط به‌ظاهر بدیهی را نقض کند.</p>
+        </div>
 
         <div class="side-compare">
             <div class="compare-col">
-                <h3 style="color:var(--c-green);">شرط برقرار است</h3>
-                <div class="card-header"><span>قبل</span><span class="badge condorcet">برنده: A</span></div>
-                <div class="graph-wrap"><canvas id="holdBefore" width="400" height="400"></canvas></div>
-                <div class="graph-legend" id="holdBeforeL"></div>
-                <div id="holdBeforeBars"></div>
-                <div class="card-header" style="margin-top:10px;"><span>بعد — A بالاتر رفته</span><span class="badge condorcet">برنده: A</span></div>
-                <div class="graph-wrap"><canvas id="holdAfter" width="400" height="400"></canvas></div>
-                <div class="graph-legend" id="holdAfterL"></div>
-                <div id="holdAfterBars"></div>
+                <h3 style="color:var(--c-green);">شرط برقرار است — اکثریت</h3>
+                <div class="card-header"><span>قبل</span><span class="badge condorcet" id="holdBeforeW">برنده: —</span></div>
+                <div id="holdBeforeTally"></div>
+                <div class="card-header" style="margin-top:10px;"><span>بعد — A بالاتر رفته</span><span class="badge condorcet" id="holdAfterW">برنده: —</span></div>
+                <div id="holdAfterTally"></div>
             </div>
             <div class="compare-col">
-                <h3 style="color:var(--c-rose);">شرط نقض می‌شود</h3>
-                <div class="card-header"><span>قبل</span><span class="badge condorcet">جایگاه بهتر: A برنده</span></div>
-                <div class="graph-wrap"><canvas id="failBefore" width="400" height="400"></canvas></div>
-                <div class="graph-legend" id="failBeforeL"></div>
-                <div class="result-box win">برنده: A</div>
-                <div class="card-header" style="margin-top:10px;"><span>بعد — وضعیت A بهتر شده</span><span class="badge cycle">جایگاه بدتر</span></div>
-                <div class="graph-wrap"><canvas id="failAfter" width="400" height="400"></canvas></div>
-                <div class="graph-legend" id="failAfterL"></div>
-                <div class="result-box loss">برنده: C — با وجود بهتر شدن A</div>
+                <h3 style="color:var(--c-rose);">شرط نقض می‌شود — حذف تدریجی</h3>
+                <div class="card-header"><span>قبل</span><span class="badge condorcet" id="failBeforeW">برنده: —</span></div>
+                <div id="failBeforeTally"></div>
+                <div class="card-header" style="margin-top:10px;"><span>بعد — یک رأی B به A تبدیل شده</span><span class="badge cycle" id="failAfterW">برنده: —</span></div>
+                <div id="failAfterTally"></div>
             </div>
         </div>
 
@@ -52,6 +49,7 @@
                 </div>
                 <div>
                     <div id="liveOut"></div>
+                    <div id="liveTally"></div>
                     <div class="graph-wrap"><canvas id="graphCanvas" width="420" height="420"></canvas></div>
                     <div class="graph-legend" id="graphLegend"></div>
                 </div>
@@ -62,69 +60,57 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const FIVE = ['A','B','C','D','E'];
+        const THREE = ['A', 'B', 'C'];
         const holdBefore = M.expandGroups([
-            { n: 6, rank: 'A>B>C>D>E' },
-            { n: 4, rank: 'B>A>C>D>E' },
-            { n: 3, rank: 'C>B>A>D>E' },
-            { n: 2, rank: 'D>E>B>C>A' },
-            { n: 2, rank: 'E>D>C>B>A' }
+            { n: 3, rank: 'A>B>C' },
+            { n: 2, rank: 'B>A>C' },
+            { n: 1, rank: 'C>B>A' }
         ]);
         const holdAfter = M.expandGroups([
-            { n: 8, rank: 'A>B>C>D>E' },
-            { n: 2, rank: 'B>A>C>D>E' },
-            { n: 3, rank: 'C>B>A>D>E' },
-            { n: 2, rank: 'D>E>B>C>A' },
-            { n: 2, rank: 'E>D>C>B>A' }
+            { n: 4, rank: 'A>B>C' },
+            { n: 1, rank: 'B>A>C' },
+            { n: 1, rank: 'C>B>A' }
         ]);
         const failBefore = M.expandGroups([
-            { n: 6, rank: 'A>B>C>D>E' },
-            { n: 6, rank: 'B>C>A>D>E' },
-            { n: 5, rank: 'C>A>B>D>E' },
-            { n: 2, rank: 'D>E>A>B>C' },
-            { n: 2, rank: 'E>D>A>B>C' }
+            { n: 2, rank: 'A>B>C' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
         ]);
         const failAfter = M.expandGroups([
-            { n: 8, rank: 'A>B>C>D>E' },
-            { n: 4, rank: 'B>C>A>D>E' },
-            { n: 5, rank: 'C>A>B>D>E' },
-            { n: 2, rank: 'D>E>A>B>C' },
-            { n: 2, rank: 'E>D>A>B>C' }
+            { n: 3, rank: 'A>B>C' },
+            { n: 1, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
         ]);
 
-        function paint(id, legendId, barsId, voters, winner, method) {
-            const counts = M.buildCounts(voters, FIVE);
-            M.drawGraph(document.getElementById(id), counts, { candidates: FIVE, highlightWinner: winner });
-            document.getElementById(legendId).innerHTML = M.legendHtml(counts, { candidates: FIVE });
-            if (barsId) {
-                const scores = method === 'pl'
-                    ? M.plurality(voters, FIVE).counts
-                    : M.borda(voters, FIVE).scores;
-                M.renderScoreBars(document.getElementById(barsId), scores, FIVE);
-            }
+        function paintTally(id, voters, badgeId, method) {
+            M.renderRankTally(document.getElementById(id), voters, THREE);
+            const w = method === 'hare' ? M.hare(voters, THREE).winner : M.plurality(voters, THREE).winner;
+            document.getElementById(badgeId).textContent = 'برنده: ' + (w || '—');
         }
-        paint('holdBefore', 'holdBeforeL', 'holdBeforeBars', holdBefore, 'A', 'pl');
-        paint('holdAfter', 'holdAfterL', 'holdAfterBars', holdAfter, 'A', 'pl');
-        paint('failBefore', 'failBeforeL', null, failBefore, 'A');
-        paint('failAfter', 'failAfterL', null, failAfter, 'C');
+        paintTally('holdBeforeTally', holdBefore, 'holdBeforeW', 'pl');
+        paintTally('holdAfterTally', holdAfter, 'holdAfterW', 'pl');
+        paintTally('failBeforeTally', failBefore, 'failBeforeW', 'hare');
+        paintTally('failAfterTally', failAfter, 'failAfterW', 'hare');
 
         const lab = M.createLab({
-            candidates: FIVE,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
             onRender(counts) {
                 const cands = lab.state.candidates;
                 const pl = M.plurality(lab.state.voters, cands);
+                const hr = M.hare(lab.state.voters, cands);
                 const el = document.getElementById('liveOut');
-                if (!lab.state.voters.length) { el.innerHTML = ''; return; }
-                el.innerHTML = `<div class="result-box info">برنده رأیِ اول در این آرا: ${pl.winner || '—'}</div>`;
+                if (!lab.state.voters.length) { el.innerHTML = ''; document.getElementById('liveTally').innerHTML = ''; return; }
+                el.innerHTML = `<div class="result-box info">اکثریت: ${pl.winner || '—'} &nbsp;|&nbsp; حذف تدریجی: ${hr.winner || '—'}</div>`;
+                M.renderRankTally(document.getElementById('liveTally'), lab.state.voters, cands);
                 M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: pl.winner });
             }
         });
-        document.getElementById('loadHold').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(holdBefore, true); });
-        document.getElementById('loadFailB').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(failBefore, true); });
-        document.getElementById('loadFailA').addEventListener('click', () => { lab.setCandidates(FIVE); lab.setVoters(failAfter, true); });
+        document.getElementById('loadHold').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(holdBefore, true); });
+        document.getElementById('loadFailB').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(failBefore, true); });
+        document.getElementById('loadFailA').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(failAfter, true); });
         lab.setVoters(failBefore, true);
     </script>
 </body>

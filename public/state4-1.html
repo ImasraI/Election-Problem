@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2 class="cond-title">وجود همیشگی برنده (AAW)</h2>
+        <div class="explain-panel">
+            <p>سیستم مطلوب باید برای هر مجموعه رأی ممکن، دست‌کم یک برنده معرفی کند.</p>
+            <p>نباید هیچ‌وقت بدون پاسخ بماند؛ حتی وقتی مقایسه‌های دونفره یک دور می‌سازند.</p>
+            <p>این شرط Always A Winner نام دارد. پارادوکس کندورسه نمونه‌ای است که در آن برندهٔ مطلق نیست.</p>
+        </div>
 
         <div class="card">
             <div class="card-header"><span>نامزدها و آرا</span></div>
@@ -36,9 +41,9 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const SIX = ['A','B','C','D','E','F'];
+        const THREE = ['A', 'B', 'C'];
         const lab = M.createLab({
-            candidates: SIX,
+            candidates: THREE,
             keepParadox: true,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
@@ -55,9 +60,9 @@
             }
         });
         document.getElementById('loadEx').addEventListener('click', () => {
-            lab.setVoters(M.cyclicVoters(lab.state.candidates), true);
+            lab.setVoters(M.cyclicVoters(THREE), true);
         });
-        lab.setVoters(M.cyclicVoters(SIX), true);
+        lab.setVoters(M.cyclicVoters(THREE), true);
     </script>
 </body>
 </html>

@@ -4,7 +4,6 @@
     // How often the classroom asks the server for updates (milliseconds).
     // 5000 = every 5 seconds. Raise this to slow sync; lower it to refresh faster.
     const POLL_MS = 5000;
-
     function token() {
         return localStorage.getItem(TOKEN_KEY) || '';
     }

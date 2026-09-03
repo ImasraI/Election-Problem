@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2 class="cond-title">روش کندورسه</h2>
+        <div class="explain-panel">
+            <p>هر دو نامزد با هم مقایسه می‌شوند؛ اگر کسی همه را دونفره ببرد، همان برنده است.</p>
+            <p>معیار کندورسه به‌طور طبیعی برقرار است، چون روش دقیقاً همان نامزد را پیدا می‌کند.</p>
+            <p>اگر دور کامل باشد، روش پاسخی نمی‌دهد و شرط «همیشه برنده» نقض می‌شود.</p>
+        </div>
         <div id="chart"></div>
         <div class="card">
             <div class="card-header"><span>گراف</span></div>
@@ -37,17 +42,23 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const FIVE = ['A','B','C','D','E'];
+        const THREE = ['A', 'B', 'C'];
         M.renderCriteriaChart(document.getElementById('chart'), {
             AAW: false, CWC: true, UNAN: true, MONO: true, IIA: true
         }, {
             title: 'نمودار ازپیش‌آماده‌شده',
             examples: [
-                { rule: 'AAW', title: 'چرخه پنج‌نامزدی', ballots: ['۱ نفر: A ≻ B ≻ C ≻ D ≻ E', 'و چهار چرخش مشابه'], result: 'هیچ‌کس همه را دونفره نمی‌برد.', why: 'روش بدون شکستن تساوی/چرخه پاسخی ندارد؛ پس همیشه برنده نیست.' }
+                {
+                    rule: 'AAW',
+                    title: 'چرخه کامل؛ روش ساکت می‌ماند',
+                    ballots: [M.ballotChip(2, 'A>B>C'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>A>B')],
+                    result: 'A بر B، B بر C، C بر A. هیچ‌کس همه را دونفره نمی‌برد.',
+                    why: 'بدون شکستن تساوی/چرخه پاسخی نیست؛ پس همیشه برنده نیست.'
+                }
             ]
         });
         const lab = M.createLab({
-            candidates: FIVE,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             matrixId: 'matrixTable', graphId: 'graphCanvas', legendId: 'graphLegend',
@@ -61,12 +72,12 @@
             }
         });
         document.getElementById('winBtn').addEventListener('click', () => {
-            lab.setVoters(M.condorcetWinnerVoters(lab.state.candidates, 'A'), true);
+            lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
         });
         document.getElementById('cycleBtn').addEventListener('click', () => {
-            lab.setVoters(M.cyclicVoters(lab.state.candidates), true);
+            lab.setVoters(M.cyclicVoters(THREE), true);
         });
-        lab.setVoters(M.condorcetWinnerVoters(FIVE, 'A'), true);
+        lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
     </script>
 </body>
 </html>

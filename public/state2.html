@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2>استیت ۲ – مقایسه دوبه‌دو و یک برنده مشخص</h2>
+        <div class="explain-panel">
+            <p>برندهٔ کندورسه کسی است که در مقایسهٔ دونفره با همهٔ رقبا پیروز شود.</p>
+            <p>وقتی دور وجود ندارد، این مقایسه‌ها یک ترتیب کامل از بهتر به بدتر می‌سازند.</p>
+            <p>اگر چنین نامزدی باشد، سیستم منطقی باید همان را اعلام کند.</p>
+        </div>
 
         <div class="card">
             <div class="card-header"><span>نامزدها</span></div>
@@ -57,9 +62,9 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const FIVE = ['A', 'B', 'C', 'D', 'E'];
+        const THREE = ['A', 'B', 'C'];
         const lab = M.createLab({
-            candidates: FIVE,
+            candidates: THREE,
             stepwise: true,
             highlightCondorcet: true,
             adderId: 'adder',
@@ -103,10 +108,10 @@
             }
         });
         document.getElementById('loadEx').addEventListener('click', () => {
-            lab.setCandidates(FIVE);
-            lab.setVoters(M.condorcetWinnerVoters(FIVE, 'A'), true);
+            lab.setCandidates(THREE);
+            lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
         });
-        lab.setVoters(M.condorcetWinnerVoters(FIVE, 'A'), true);
+        lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
     </script>
 </body>
 </html>

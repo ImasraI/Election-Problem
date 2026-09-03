@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2 class="cond-title">اجماع / پارتو (UNAN)</h2>
+        <div class="explain-panel">
+            <p>اگر همهٔ رأی‌دهندگان، بدون استثنا، a را به b ترجیح دهند، b نباید برنده شود.</p>
+            <p>این ساده‌ترین شرط از پنج شرط است و Pareto / Unanimity نام دارد.</p>
+            <p>در فهرست کامل هم همان روح برقرار است: a باید بالاتر از b بماند، نه فقط این‌که b برنده نشود.</p>
+        </div>
 
         <div class="card">
             <div class="card-header"><span>نامزدها و آرا</span></div>
@@ -35,11 +40,10 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const SIX = ['A','B','C','D','E','F'];
+        const THREE = ['A', 'B', 'C'];
         const EXAMPLE = M.expandGroups([
-            { n: 3, rank: 'A>C>D>E>F>B' },
-            { n: 2, rank: 'A>D>C>E>F>B' },
-            { n: 2, rank: 'A>E>C>D>F>B' }
+            { n: 3, rank: 'A>C>B' },
+            { n: 3, rank: 'A>B>C' }
         ]);
         function allPrefer(voters, x, y) {
             if (!voters.length) return false;
@@ -49,7 +53,7 @@
             });
         }
         const lab = M.createLab({
-            candidates: SIX,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
@@ -74,7 +78,7 @@
             }
         });
         document.getElementById('loadEx').addEventListener('click', () => {
-            lab.setCandidates(SIX);
+            lab.setCandidates(THREE);
             lab.setVoters(EXAMPLE, true);
         });
         lab.setVoters(EXAMPLE, true);

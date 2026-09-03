@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2 class="cond-title">مقایسه زوجی با دستورکار ثابت</h2>
+        <div class="explain-panel">
+            <p>از قبل یک دستورکار (Agenda) ثابت می‌شود: مثلاً اول A با B، برنده با C.</p>
+            <p>همیشه برنده دارد و اگر برندهٔ کندورسه باشد او تا آخر می‌ماند.</p>
+            <p>عوض کردن فقط ترتیب مبارزه — بدون عوض شدن هیچ رأیی — می‌تواند برنده را عوض کند؛ پس IIA نقض می‌شود.</p>
+        </div>
         <div id="chart"></div>
         <div class="card">
             <div id="candBar"></div>
@@ -38,23 +43,33 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const FOUR = ['A','B','C','D'];
-        const EXAMPLE = M.cyclicVoters(FOUR);
+        const THREE = ['A', 'B', 'C'];
+        const EXAMPLE = M.expandGroups([
+            { n: 2, rank: 'A>B>C' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
+        ]);
         M.renderCriteriaChart(document.getElementById('chart'), {
             AAW: true, CWC: true, UNAN: true, MONO: true, IIA: false
         }, {
             title: 'نمودار ازپیش‌آماده‌شده',
             examples: [
-                { rule: 'IIA', title: 'دو دستورکار، یک مجموعه رأی', ballots: ['دستورکار A، B، C، D', 'دستورکار D، C، B، A'], result: 'برنده عوض می‌شود در حالی که هیچ ترجیحی عوض نشده.', why: 'ترتیب مبارزه یک گزینه نامرتبط است و نتیجه را عوض می‌کند.' }
+                {
+                    rule: 'IIA',
+                    title: 'دو دستورکار، یک مجموعه رأی کامل',
+                    ballots: [M.ballotChip(2, 'A>B>C'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>A>B')],
+                    result: 'دستورکار A، B، C برنده دیگری می‌دهد نسبت به C، B، A. هیچ ترجیحی عوض نشده.',
+                    why: 'ترتیب مبارزه یک گزینهٔ نامرتبط است و نتیجه را عوض می‌کند.'
+                }
             ]
         });
-        let agendaW = new M.RankingWidget('agendaRank', { candidates: FOUR, order: FOUR, onChange() { if (lab) lab.render(); } });
+        let agendaW = new M.RankingWidget('agendaRank', { candidates: THREE, order: THREE, onChange() { if (lab) lab.render(); } });
         function stepsHtml(steps, winner) {
             return steps.map(s => `<span class="step">${s.a} در برابر ${s.b} → <span class="winner">${s.winner || '—'}</span></span><span class="arrow">→</span>`).join('')
                 + `<span class="step" style="background:rgba(110,231,183,.16);border:2px solid #6ee7b7;">برنده: ${winner}</span>`;
         }
         const lab = M.createLab({
-            candidates: FOUR,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
@@ -76,7 +91,7 @@
             }
         });
         document.getElementById('loadEx').addEventListener('click', () => {
-            lab.setCandidates(FOUR);
+            lab.setCandidates(THREE);
             lab.setVoters(EXAMPLE, true);
         });
         lab.setVoters(EXAMPLE, true);

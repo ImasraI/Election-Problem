@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2 class="cond-title">روش اکثریت (فقط رأی اول)</h2>
+        <div class="explain-panel">
+            <p>از هر نفر فقط انتخاب اول پرسیده می‌شود؛ نامزدی که بیشترین رأی اول را دارد برنده است.</p>
+            <p>همیشه یک برنده معرفی می‌شود، پس AAW برقرار است.</p>
+            <p>اولویت‌های دوم و سوم نادیده می‌مانند؛ ممکن است برندهٔ کندورسه حذف شود و جابه‌جایی C نتیجهٔ A و B را عوض کند.</p>
+        </div>
         <div id="chart"></div>
         <div class="card">
             <div id="candBar"></div>
@@ -35,25 +40,35 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const SIX = ['A','B','C','D','E','F'];
+        const THREE = ['A', 'B', 'C'];
         const EXAMPLE = M.expandGroups([
-            { n: 5, rank: 'A>C>B>D>E>F' },
-            { n: 4, rank: 'B>C>D>E>A>F' },
-            { n: 3, rank: 'D>C>E>B>A>F' },
-            { n: 2, rank: 'E>C>D>B>A>F' },
-            { n: 3, rank: 'C>A>B>D>E>F' }
+            { n: 2, rank: 'A>C>B' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>B>A' }
         ]);
         M.renderCriteriaChart(document.getElementById('chart'), {
             AAW: true, CWC: false, UNAN: true, MONO: true, IIA: false
         }, {
             title: 'نمودار ازپیش‌آماده‌شده',
             examples: [
-                { rule: 'CWC', title: 'رأی اول با برنده کندورسه یکی نیست', ballots: ['۵ نفر: A ≻ C ≻ B ≻ D ≻ E', '۴ نفر: B ≻ C ≻ …', '۳ نفر: C ≻ A ≻ …'], result: 'اکثریت A را برنده می‌کند؛ کندورسه C است.', why: 'فقط رأی اول، پیروزی‌های دونفره C را نمی‌بیند.' },
-                { rule: 'IIA', title: 'جابه‌جایی C نتیجه A و B را عوض می‌کند', ballots: ['قبل: A برنده است', 'بعد: فقط C جابه‌جا می‌شود و B برنده می‌شود'], result: 'نتیجه A در برابر B به نامزد سوم وابسته شد.', why: 'شرط استقلال نقض می‌شود.' }
+                {
+                    rule: 'CWC',
+                    title: 'رأی اول با برنده کندورسه یکی نیست',
+                    ballots: [M.ballotChip(2, 'A>C>B'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>B>A')],
+                    result: 'شمارش رأی اول بین A و B و C برابر است؛ کندورسه C است چون C هم A و هم B را دونفره می‌برد.',
+                    why: 'فقط رأی اول، پیروزی‌های دونفرهٔ C را نمی‌بیند.'
+                },
+                {
+                    rule: 'IIA',
+                    title: 'جابه‌جایی C نتیجه را عوض می‌کند',
+                    ballots: [M.ballotChip(3, 'A>B>C') + M.ballotChip(2, 'B>A>C') + M.ballotChip(1, 'C>A>B'), M.ballotChip(1, 'A>B>C') + M.ballotChip(2, 'B>A>C') + M.ballotChip(3, 'C>A>B')],
+                    result: 'قبل A برنده است. بعد فقط C بالاتر رفته و C برنده می‌شود؛ A در برابر B در همهٔ برگه‌ها ثابت مانده.',
+                    why: 'شرط استقلال نقض می‌شود.'
+                }
             ]
         });
         const lab = M.createLab({
-            candidates: SIX,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
@@ -69,7 +84,7 @@
                     (cw && cw !== pl.winner ? `<div class="result-box loss">برنده کندورسه ${cw} بود.</div>` : '');
             }
         });
-        document.getElementById('loadEx').addEventListener('click', () => { lab.setCandidates(SIX); lab.setVoters(EXAMPLE, true); });
+        document.getElementById('loadEx').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(EXAMPLE, true); });
         lab.setVoters(EXAMPLE, true);
     </script>
 </body>

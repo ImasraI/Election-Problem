@@ -204,7 +204,68 @@ button:disabled { opacity: .4; cursor: default; transform: none; }
 @media (max-width: 768px) {
     .grid-2 { grid-template-columns: 1fr; gap: 16px; }
 }
-.voter-list { max-height: 240px; overflow-y: auto; margin-top: 4px; }
+.voter-list { max-height: 420px; overflow-y: auto; margin-top: 4px; }
+.voter-stacks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    direction: ltr;
+    justify-content: flex-start;
+}
+.voter-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 88px;
+    padding: 12px 8px 10px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+}
+.voter-stack.marked { border-color: rgba(249,180,74,.55); background: rgba(249,180,74,.12); }
+.voter-stack .rank-arrow { min-height: 92px; }
+.voter-stack .rank-letter { font-size: 18px; }
+.voter-stack .rank-count {
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,.12);
+    text-align: center;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--c-cyan-light);
+}
+.stack-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.explain-panel {
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(57, 211, 255, .06);
+    border: 1px solid rgba(57, 211, 255, .18);
+    font-size: 14px;
+    line-height: 1.85;
+    color: var(--c-text);
+}
+.explain-panel p { margin: 0 0 .35em; }
+.ballot-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 64px;
+    padding: 8px 6px;
+    margin: 4px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.1);
+    direction: ltr;
+    vertical-align: top;
+}
+.ballot-chip .rank-arrow { min-height: 72px; }
+.ballot-chip .rank-letter { font-size: 16px; }
+.ballot-chip b { color: var(--c-cyan-light); font-size: 16px; }
+.counterexample-card ul.plain { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.tally-block { margin-top: 8px; }
 .voter-item {
     display: flex;
     justify-content: space-between;

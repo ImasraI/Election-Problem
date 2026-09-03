@@ -9,6 +9,11 @@
 <body>
     <div class="container">
         <h2 class="cond-title">معیار کندورسه (CWC)</h2>
+        <div class="explain-panel">
+            <p>برندهٔ کندورسه کسی است که در مقایسهٔ دونفره با تک‌تک رقبا پیروز شود.</p>
+            <p>اگر چنین نامزدی باشد، نادیده گرفتن او غیرمنطقی است؛ سیستم باید همان را برنده اعلام کند.</p>
+            <p>این شرط از AAW جداست: ممکن است همیشه برنده‌ای باشد که کندورسه نیست.</p>
+        </div>
 
         <div class="card">
             <div class="card-header"><span>نامزدها و آرا</span></div>
@@ -36,16 +41,14 @@
     <script src="workshop.js"></script>
     <script>
         const M = Mentor;
-        const FIVE = ['A','B','C','D','E'];
+        const THREE = ['A', 'B', 'C'];
         const EXAMPLE = M.expandGroups([
-            { n: 5, rank: 'A>C>B>D>E' },
-            { n: 4, rank: 'B>C>D>E>A' },
-            { n: 3, rank: 'D>C>E>B>A' },
-            { n: 2, rank: 'E>C>D>B>A' },
-            { n: 3, rank: 'C>A>B>D>E' }
+            { n: 2, rank: 'A>C>B' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>B>A' }
         ]);
         const lab = M.createLab({
-            candidates: FIVE,
+            candidates: THREE,
             adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
             voterListId: 'voterList', resetBtnId: 'resetBtn',
             graphId: 'graphCanvas', legendId: 'graphLegend',
@@ -69,7 +72,7 @@
             }
         });
         document.getElementById('loadEx').addEventListener('click', () => {
-            lab.setCandidates(FIVE);
+            lab.setCandidates(THREE);
             lab.setVoters(EXAMPLE, true);
         });
         lab.setVoters(EXAMPLE, true);
