@@ -1,6 +1,9 @@
 /* workshop session + polling */
 (function (global) {
     const TOKEN_KEY = 'workshop-token';
+    // How often the classroom asks the server for updates (milliseconds).
+    // 5000 = every 5 seconds. Raise this to slow sync; lower it to refresh faster.
+    const POLL_MS = 5000;
 
     function token() {
         return localStorage.getItem(TOKEN_KEY) || '';
@@ -48,22 +51,47 @@
         async unlock(id) { return request('POST', '/api/unlock', { id }); },
         async hide(id) { return request('POST', '/api/hide', { id }); },
         startPolling(onData, ms) {
-            let version = -1;
-            let timer = null;
+            const interval = ms || POLL_MS;
+            const root = (function () {
+                try { return window.top || window; } catch (e) { return window; }
+            })();
+            if (!root.__workshopPoll) {
+                root.__workshopPoll = {
+                    subscribers: [],
+                    lastData: null,
+                    version: -1,
+                    timer: null,
+                    inFlight: false
+                };
+            }
+            const poll = root.__workshopPoll;
+            poll.subscribers.push(onData);
+            if (poll.lastData) {
+                try { onData(poll.lastData, false); } catch (e) { /* ignore */ }
+            }
             async function tick() {
+                if (poll.inFlight) return;
+                poll.inFlight = true;
                 try {
                     const data = await Workshop.sync();
-                    if (data.version !== version) {
-                        version = data.version;
-                        onData(data, true);
-                    } else {
-                        onData(data, false);
-                    }
+                    const changed = data.version !== poll.version;
+                    if (changed) poll.version = data.version;
+                    poll.lastData = data;
+                    poll.subscribers.slice().forEach(fn => {
+                        try { fn(data, changed); } catch (e) { /* ignore dead panels */ }
+                    });
                 } catch (e) { /* keep polling */ }
+                poll.inFlight = false;
             }
-            tick();
-            timer = setInterval(tick, ms || 2000);
-            return () => clearInterval(timer);
+            if (!poll.timer) {
+                tick();
+                poll.timer = setInterval(tick, interval);
+            }
+            function stop() {
+                poll.subscribers = poll.subscribers.filter(fn => fn !== onData);
+            }
+            window.addEventListener('pagehide', stop, { once: true });
+            return stop;
         }
     };
 
