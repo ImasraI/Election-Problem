@@ -1,10 +1,12 @@
 import os
+from functools import partial
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from llm_core import MODEL_NAME
 import workshop
@@ -196,7 +198,7 @@ async def state1_evaluate(request: Request):
     except Exception:
         return JSONResponse({"error": "Body must be JSON."}, status_code=400)
     try:
-        idea = workshop.process_state1_idea(user, body.get("id") or "")
+        idea = await run_in_threadpool(workshop.process_state1_idea, user, body.get("id") or "")
         return {"criteria": idea["criteria"], "prompt": idea["text"], "idea": idea}
     except CATCH as exc:
         return fail(exc)
@@ -286,7 +288,7 @@ async def evaluate(request: Request):
     except Exception:
         return JSONResponse({"error": "Body must be JSON."}, status_code=400)
     try:
-        idea = workshop.submit_idea(user, body.get("prompt") or "")
+        idea = await run_in_threadpool(workshop.submit_idea, user, body.get("prompt") or "")
         return {"criteria": idea["criteria"], "prompt": idea["text"], "idea": idea}
     except CATCH as exc:
         return fail(exc)
@@ -304,11 +306,14 @@ async def examples(request: Request):
     except Exception:
         return JSONResponse({"error": "Body must be JSON."}, status_code=400)
     try:
-        idea = workshop.add_examples(
-            user,
-            idea_id=body.get("id") or "",
-            prompt=body.get("prompt") or "",
-            criteria=body.get("criteria"),
+        idea = await run_in_threadpool(
+            partial(
+                workshop.add_examples,
+                user,
+                idea_id=body.get("id") or "",
+                prompt=body.get("prompt") or "",
+                criteria=body.get("criteria"),
+            )
         )
         return {"examples": idea.get("examples") or [], "idea": idea}
     except CATCH as exc:
