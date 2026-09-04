@@ -1,10 +1,12 @@
 import os
+from functools import partial
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from llm_core import MODEL_NAME
 import workshop
@@ -173,6 +175,19 @@ async def admin_create_admin(request: Request):
         return fail(exc)
 
 
+@app.post("/api/admin/skyroom")
+async def admin_set_skyroom(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        url = workshop.set_skyroom_url(user, body.get("url") or "", body.get("username") or "")
+        return {"ok": True, "skyroom_url": url}
+    except CATCH as exc:
+        return fail(exc)
+
+
 @app.post("/api/state1")
 async def state1_idea(request: Request):
     user, err = require_user(request)
@@ -196,7 +211,7 @@ async def state1_evaluate(request: Request):
     except Exception:
         return JSONResponse({"error": "Body must be JSON."}, status_code=400)
     try:
-        idea = workshop.process_state1_idea(user, body.get("id") or "")
+        idea = await run_in_threadpool(workshop.process_state1_idea, user, body.get("id") or "")
         return {"criteria": idea["criteria"], "prompt": idea["text"], "idea": idea}
     except CATCH as exc:
         return fail(exc)
@@ -212,6 +227,62 @@ async def ideas_delete(request: Request):
     try:
         body = await request.json()
         return workshop.delete_idea(user, body.get("id") or "", body.get("source") or "")
+    except CATCH as exc:
+        return fail(exc)
+
+
+@app.post("/api/lobby/join")
+async def lobby_join(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Body must be JSON."}, status_code=400)
+    try:
+        return workshop.join_lobby(body.get("name") or "", body.get("group") or "")
+    except ValueError as exc:
+        return fail(exc)
+
+
+@app.get("/api/lobby/status")
+def lobby_status(request: Request):
+    token = request.query_params.get("token") or ""
+    try:
+        return workshop.lobby_snapshot(token)
+    except ValueError as exc:
+        return fail(exc)
+
+
+@app.get("/api/lobby")
+def lobby_list(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        return {"lobby": workshop.list_lobby(user)}
+    except CATCH as exc:
+        return fail(exc)
+
+
+@app.post("/api/lobby/pull")
+async def lobby_pull(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        return workshop.pull_from_lobby(user, body.get("id") or "")
+    except CATCH as exc:
+        return fail(exc)
+
+
+@app.post("/api/lobby/remove")
+async def lobby_remove(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        return workshop.remove_from_lobby(user, body.get("id") or "")
     except CATCH as exc:
         return fail(exc)
 
@@ -286,7 +357,7 @@ async def evaluate(request: Request):
     except Exception:
         return JSONResponse({"error": "Body must be JSON."}, status_code=400)
     try:
-        idea = workshop.submit_idea(user, body.get("prompt") or "")
+        idea = await run_in_threadpool(workshop.submit_idea, user, body.get("prompt") or "")
         return {"criteria": idea["criteria"], "prompt": idea["text"], "idea": idea}
     except CATCH as exc:
         return fail(exc)
@@ -304,11 +375,14 @@ async def examples(request: Request):
     except Exception:
         return JSONResponse({"error": "Body must be JSON."}, status_code=400)
     try:
-        idea = workshop.add_examples(
-            user,
-            idea_id=body.get("id") or "",
-            prompt=body.get("prompt") or "",
-            criteria=body.get("criteria"),
+        idea = await run_in_threadpool(
+            partial(
+                workshop.add_examples,
+                user,
+                idea_id=body.get("id") or "",
+                prompt=body.get("prompt") or "",
+                criteria=body.get("criteria"),
+            )
         )
         return {"examples": idea.get("examples") or [], "idea": idea}
     except CATCH as exc:

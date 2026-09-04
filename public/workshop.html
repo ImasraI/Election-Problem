@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>کارگاه انتخاب اجتماعی</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+        body { padding: 16px; display: flex; justify-content: center; }
+        @media (max-width: 1520px) {
+            body { padding-left: 108px; }
+        }
+        .app {
+            max-width: 1400px; width: 100%;
+            background: linear-gradient(150deg, rgba(var(--c-surface-strong), .82), rgba(var(--c-surface), .68)),
+                        linear-gradient(180deg, rgba(255,255,255,.05), transparent);
+            border: 1px solid rgba(var(--c-border), .16);
+            border-radius: 32px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .5);
+            backdrop-filter: blur(16px);
+            padding: 28px 32px 40px;
+            animation: heroSlideUp .55s cubic-bezier(.4,0,.2,1);
+        }
+        .header {
+            display: flex; flex-wrap: wrap; align-items: center;
+            gap: 12px 20px; margin-bottom: 16px;
+        }
+        .app-logo {
+            max-height: 120px;
+            max-width: 240px;
+            width: auto;
+            height: auto;
+            display: block;
+            flex-shrink: 0;
+            object-fit: contain;
+            filter: drop-shadow(0 8px 18px rgba(0, 0, 0, .45));
+        }
+        .app-logo[hidden] { display: none !important; }
+        .header h1 {
+            font-size: 26px; font-weight: 800; color: var(--c-text);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .tab-bar, .sub-tab-bar {
+            display: flex; flex-wrap: wrap; gap: 6px;
+            margin-bottom: 12px; align-items: center;
+        }
+        .tab-bar { border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 10px; }
+        .tab-btn, .sub-tab-btn {
+            background: rgba(255,255,255,.04);
+            border: 1px solid rgba(255,255,255,.08);
+            padding: 8px 16px; font-size: 14px; font-weight: 700;
+            color: var(--c-text); border-radius: 12px; cursor: pointer;
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+        }
+        .sub-tab-btn { padding: 6px 12px; font-size: 13px; border-radius: 10px; }
+        .tab-btn:hover, .sub-tab-btn:hover { background: rgba(255,255,255,.09); color: var(--c-text); }
+        .tab-btn.active {
+            background: var(--c-cyan-light); color: #041019;
+            border-color: rgba(103, 232, 249, .5);
+            box-shadow: 0 -6px 20px rgba(57, 211, 255, .28);
+        }
+        .sub-tab-btn.active {
+            background: var(--c-amber); color: #1a1204;
+            border-color: rgba(249, 180, 74, .5);
+        }
+        .tab-nav { display: flex; gap: 8px; margin-right: auto; align-items: center; direction: ltr; }
+        .tab-nav button {
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.12);
+            padding: 6px 14px; border-radius: 10px;
+            cursor: pointer; font-weight: 700; color: var(--c-text);
+        }
+        .tab-indicator { font-size: 14px; font-weight: 600; color: var(--c-muted); padding: 0 6px; }
+        .iframe-container {
+            width: 100%; min-height: 700px;
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 18px; overflow: hidden;
+            background: rgba(2, 6, 23, .5);
+        }
+        iframe { width: 100%; height: 700px; border: none; display: block; background: transparent; }
+        .sub-tab-bar.hidden { display: none; }
+        @media (max-width: 600px) {
+            .app { padding: 16px 12px 24px; border-radius: 22px; }
+            .app-logo { max-height: 72px; max-width: 160px; }
+            .tab-btn { padding: 6px 10px; font-size: 13px; }
+            iframe { height: 500px; }
+        }
+    </style>
+</head>
+<body>
+    <img class="corner-logo" src="logo2.png" alt="" width="76" height="76">
+    <div class="app">
+        <div class="header">
+            <img class="app-logo" id="appLogo" alt="" hidden>
+            <h1>کارگاه انتخاب اجتماعی</h1>
+            <div class="user-chip" id="userChip"></div>
+        </div>
+
+        <div class="card admin-panel hidden" id="adminPanel">
+            <div class="fold">
+                <button class="fold-toggle" id="toggleAccounts" type="button" aria-expanded="false">
+                    <span id="adminPanelTitle">حساب‌ها</span>
+                    <span class="fold-caret">▸</span>
+                </button>
+                <div class="fold-body hidden" id="accountsBody">
+                    <div class="admin-create hidden" id="ownerCreate">
+                        <input id="newAdmin" placeholder="نام کاربری Mentor">
+                        <input id="newAdminPass" placeholder="رمز Mentor" type="password">
+                        <button class="primary" id="createAdminBtn" type="button">ساخت Mentor</button>
+                    </div>
+                    <div class="admin-create" style="margin-top:8px;">
+                        <input id="newUser" placeholder="نام کاربری Voter">
+                        <input id="newPass" placeholder="رمز عبور" type="password">
+                        <button class="primary" id="createUserBtn" type="button">ساخت Voter</button>
+                        <button class="outline" id="resetWorkshopBtn" type="button">بازنشانی پنل‌ها</button>
+                        <button class="outline" id="resetVoteBtn" type="button">بازنشانی رأی‌گیری</button>
+                    </div>
+                    <div class="skyroom-edit" id="ownSkyroomRow">
+                        <label for="ownSkyroomUrl">لینک اسکایروم کلاس شما</label>
+                        <input id="ownSkyroomUrl" placeholder="https://www.skyroom.online/..." dir="ltr">
+                        <button class="primary" id="saveOwnSkyroomBtn" type="button">ذخیره لینک</button>
+                    </div>
+                    <div id="adminStatus" class="text-muted" style="margin-top:8px;"></div>
+                    <div id="userGroups"></div>
+                </div>
+            </div>
+            <div class="fold">
+                <button class="fold-toggle" id="toggleLobby" type="button" aria-expanded="false">
+                    <span>لابی — شرکت‌کنندگان در انتظار</span>
+                    <span class="fold-caret">▸</span>
+                </button>
+                <div class="fold-body hidden" id="lobbyBody">
+                    <p class="text-muted" style="margin-bottom:10px;">شرکت‌کنندگانی که از <a href="index.html" target="_blank">لابی</a> وارد شده‌اند. آن‌ها را به کلاس دعوت کنید یا حذف کنید.</p>
+                    <div id="lobbyList"></div>
+                    <div id="lobbyStatus" class="text-muted" style="margin-top:8px;"></div>
+                </div>
+            </div>
+            <div class="fold">
+                <button class="fold-toggle" id="togglePoints" type="button" aria-expanded="false">
+                    <span>تابلوی امتیازها</span>
+                    <span class="fold-caret">▸</span>
+                </button>
+                <div class="fold-body hidden points-board" id="pointsBoard"></div>
+            </div>
+        </div>
+
+        <div class="tab-bar" id="tabBar"></div>
+        <div class="sub-tab-bar hidden" id="subTabBar"></div>
+
+        <div class="iframe-container">
+            <iframe id="stateFrame" src="home.html" title="استیت جاری"></iframe>
+        </div>
+    </div>
+    <button class="skyroom-fab" id="skyroomBtn" type="button">اسکایروم</button>
+
+    <script src="workshop.js"></script>
+    <script>
+        const GROUPS = [
+            { id: 'vote', label: 'Voting', file: 'vote.html' },
+            { id: 's1', label: 'State 1', file: 'state1.html' },
+            { id: 's2', label: 'State 2', file: 'state2.html' },
+            { id: 's3', label: 'State 3', file: 'state3.html' },
+            {
+                id: 's4', label: 'State 4',
+                children: [
+                    { id: 's4-1', label: '۴.۱ همیشه برنده', file: 'state4-1.html' },
+                    { id: 's4-2', label: '۴.۲ معیار کندورسه', file: 'state4-2.html' },
+                    { id: 's4-3', label: '۴.۳ اجماع', file: 'state4-3.html' },
+                    { id: 's4-4', label: '۴.۴ یکنوایی', file: 'state4-4.html' },
+                    { id: 's4-5', label: '۴.۵ استقلال', file: 'state4-5.html' }
+                ]
+            },
+            { id: 's5', label: 'State 5', file: 'state5.html' },
+            {
+                id: 's6', label: 'State 6',
+                children: [
+                    { id: 's6-1', label: 'کندورسه', file: 'state6-1.html' },
+                    { id: 's6-2', label: 'اکثریت', file: 'state6-2.html' },
+                    { id: 's6-3', label: 'بوردا', file: 'state6-3.html' },
+                    { id: 's6-4', label: 'حذف تدریجی', file: 'state6-4.html' },
+                    { id: 's6-5', label: 'زوجی ترتیبی', file: 'state6-5.html' },
+                    { id: 's6-6', label: 'جدول خلاصه', file: 'state6-6.html' }
+                ]
+            },
+            { id: 's8', label: 'Glimpse of Impossibility', file: 'glimpse.html' },
+            { id: 's7', label: "َArrow's theorem", file: 'Arrows_therom.html' }
+        ];
+
+        const NAMED_WHEN_LOCKED = new Set();
+        const leaves = [];
+        GROUPS.forEach(g => {
+            if (g.children) g.children.forEach(c => leaves.push({ ...c, group: g.id }));
+            else leaves.push({ ...g, group: g.id });
+        });
+
+        const tabBar = document.getElementById('tabBar');
+        const subTabBar = document.getElementById('subTabBar');
+        const iframe = document.getElementById('stateFrame');
+        let current = -1;
+        let currentGroup = null;
+        let me = null;
+        let unlocked = [];
+        let lobby = [];
+        const locallyHidden = new Set();
+
+        function isStaff() { return me && (me.role === 'owner' || me.role === 'admin'); }
+        function isOwner() { return me && me.role === 'owner'; }
+        function roleLabel(role) {
+            if (role === 'owner') return 'Admin';
+            if (role === 'admin') return 'Mentor';
+            return 'Voter';
+        }
+        function isUnlocked(id) {
+            if (locallyHidden.has(id)) return false;
+            return unlocked.indexOf(id) >= 0;
+        }
+        function relatedHideIds(id) {
+            const ids = [id];
+            if (id === 's4' || id === 's6') {
+                leaves.filter(l => String(l.id).startsWith(id)).forEach(l => ids.push(l.id));
+            }
+            return ids;
+        }
+        function relatedUnlockIds(id) {
+            const ids = [id];
+            if (String(id).startsWith('s4-')) ids.push('s4');
+            if (String(id).startsWith('s6-')) ids.push('s6');
+            return ids;
+        }
+        function applyUnlock(id, fromServer) {
+            relatedUnlockIds(id).forEach(item => locallyHidden.delete(item));
+            if (Array.isArray(fromServer)) {
+                unlocked = fromServer.filter(x => !locallyHidden.has(x));
+            }
+            relatedUnlockIds(id).forEach(item => {
+                if (unlocked.indexOf(item) < 0) unlocked.push(item);
+            });
+        }
+        function groupUnlocked(g) {
+            if (g.children) return g.children.some(c => isUnlocked(c.id)) || isUnlocked(g.id);
+            return isUnlocked(g.id);
+        }
+        function firstOpenLeaf(g) {
+            if (!g.children) return g.id;
+            const open = g.children.find(c => isUnlocked(c.id));
+            return open ? open.id : g.children[0].id;
+        }
+        function panelLabel(item) {
+            if (item.children) return groupUnlocked(item) ? item.label : '';
+            if (NAMED_WHEN_LOCKED.has(item.id) || isUnlocked(item.id)) return item.label;
+            return '';
+        }
+
+        function hideBtn(id, open) {
+            if (!isStaff() || !open) return '';
+            return `<button class="hide-tab" type="button" data-hide="${id}">مخفی</button>`;
+        }
+
+        function renderUser() {
+            const chip = document.getElementById('userChip');
+            if (!me) { chip.innerHTML = ''; return; }
+            chip.innerHTML = `
+                <span>${me.name || me.username}${me.team ? ' · ' + me.team : ''}</span>
+                <span class="badge">${me.points || 0} امتیاز</span>
+                <button class="outline" id="logoutBtn" type="button">خروج</button>
+            `;
+            document.getElementById('logoutBtn').addEventListener('click', () => Workshop.logout());
+            document.getElementById('adminPanel').classList.toggle('hidden', !isStaff());
+            document.getElementById('ownerCreate').classList.toggle('hidden', !isOwner());
+            const resetBtn = document.getElementById('resetWorkshopBtn');
+            if (resetBtn) {
+                resetBtn.textContent = isOwner() ? 'بازنشانی پنل‌های همه کلاس‌ها' : 'بازنشانی پنل‌ها';
+            }
+            const title = document.getElementById('adminPanelTitle');
+            title.innerHTML = isOwner()
+                ? '<span dir="ltr">Admin: Mentors and Voters</span>'
+                : '<span dir="ltr">Mentor and Voters</span>';
+            const ownUrl = document.getElementById('ownSkyroomUrl');
+            if (ownUrl && document.activeElement !== ownUrl) {
+                ownUrl.value = me.skyroom_url || '';
+            }
+            updateSkyroomBtn();
+        }
+
+        function updateSkyroomBtn() {
+            const btn = document.getElementById('skyroomBtn');
+            if (!btn) return;
+            const url = (me && me.skyroom_url) || '';
+            btn.classList.toggle('is-empty', !url);
+            btn.title = url ? 'ورود به اسکایروم' : 'هنوز لینک اسکایروم تنظیم نشده';
+        }
+
+        async function refreshLobby() {
+            if (!isStaff()) return;
+            const list = document.getElementById('lobbyList');
+            if (!lobby.length) {
+                list.innerHTML = '<div class="empty-state">لابی خالی است.</div>';
+                return;
+            }
+            list.innerHTML = lobby.map(entry => `
+                <div class="lobby-row">
+                    <div class="lobby-who">
+                        <strong>${escapeHtml(entry.name)}</strong>
+                        <span class="text-muted"> · گروه ${escapeHtml(entry.group)}</span>
+                    </div>
+                    <div class="lobby-actions">
+                        <button class="primary lobby-pull" type="button" data-id="${escapeHtml(entry.id)}">دعوت به کلاس</button>
+                        <button class="outline lobby-remove" type="button" data-id="${escapeHtml(entry.id)}">حذف</button>
+                    </div>
+                </div>`).join('');
+            list.querySelectorAll('.lobby-pull').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const status = document.getElementById('lobbyStatus');
+                    status.textContent = 'در حال دعوت…';
+                    try {
+                        await Workshop.request('POST', '/api/lobby/pull', { id: btn.dataset.id });
+                        status.textContent = 'شرکت‌کننده به کلاس اضافه شد.';
+                        refreshUsers();
+                    } catch (err) {
+                        status.textContent = err.message || String(err);
+                    }
+                });
+            });
+            list.querySelectorAll('.lobby-remove').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const status = document.getElementById('lobbyStatus');
+                    try {
+                        await Workshop.request('POST', '/api/lobby/remove', { id: btn.dataset.id });
+                        status.textContent = 'از لابی حذف شد.';
+                    } catch (err) {
+                        status.textContent = err.message || String(err);
+                    }
+                });
+            });
+        }
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function userRowHtml(u, kind) {
+            const rowKind = kind || (u.role === 'admin' ? 'mentor-row' : (u.role === 'student' ? 'voter-row' : ''));
+            const del = u.role === 'owner'
+                ? ''
+                : `<button class="remove-btn" data-del="${escapeHtml(u.username)}" type="button">حذف</button>`;
+            return `<tr class="${rowKind}">
+                <td>${escapeHtml(u.username)}</td>
+                <td>${escapeHtml(u.name || '—')}</td>
+                <td>${escapeHtml(u.team || '—')}</td>
+                <td>${roleLabel(u.role)}</td>
+                <td>${escapeHtml(u.sponsor || '—')}</td>
+                <td>${u.points || 0}</td>
+                <td>${u.used_state5 ? 'ارسال شده' : '—'}</td>
+                <td>${del}</td>
+            </tr>`;
+        }
+
+        function skyroomEditHtml(username, url) {
+            if (!username) return '';
+            return `<div class="skyroom-edit">
+                <label>لینک اسکایروم</label>
+                <input class="skyroom-url" data-skyroom="${escapeHtml(username)}" value="${escapeHtml(url || '')}" placeholder="https://www.skyroom.online/..." dir="ltr">
+                <button class="primary" type="button" data-skyroom-save="${escapeHtml(username)}">ذخیره لینک</button>
+            </div>`;
+        }
+
+        function groupTableHtml(title, badge, members, headClass, skyUser, skyUrl) {
+            if (!members.length && !skyUser) return '';
+            const rows = members.map(u => {
+                const kind = u.role === 'admin' ? 'mentor-row' : (u.role === 'student' ? 'voter-row' : '');
+                return userRowHtml(u, kind);
+            }).join('');
+            const table = members.length ? `<table class="user-table">
+                    <thead><tr><th>کاربری</th><th>نام</th><th>تیم</th><th>نقش</th><th>Mentor</th><th>امتیاز</th><th>استیت ۵</th><th></th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>` : '';
+            return `<div class="mentor-group">
+                <div class="mentor-group-head ${headClass || ''}">
+                    <span class="badge">${escapeHtml(badge)}</span>
+                    <strong>${escapeHtml(title)}</strong>
+                    <span class="badge">${members.filter(u => u.role === 'student').length} Voter</span>
+                </div>
+                ${skyroomEditHtml(skyUser, skyUrl)}
+                ${table}
+            </div>`;
+        }
+
+        function bindUserDeletes() {
+            document.querySelectorAll('#userGroups [data-del]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    await Workshop.request('POST', '/api/admin/users/delete', { username: btn.dataset.del });
+                    refreshUsers();
+                });
+            });
+        }
+
+        async function saveSkyroomUrl(username, url) {
+            const status = document.getElementById('adminStatus');
+            status.textContent = '';
+            try {
+                const data = await Workshop.request('POST', '/api/admin/skyroom', {
+                    username: username || '',
+                    url: url || ''
+                });
+                if (me && (!username || username === me.username)) {
+                    me.skyroom_url = data.skyroom_url || '';
+                    updateSkyroomBtn();
+                }
+                status.textContent = data.skyroom_url ? 'لینک اسکایروم ذخیره شد.' : 'لینک اسکایروم پاک شد.';
+            } catch (err) {
+                status.textContent = err.message || String(err);
+            }
+        }
+
+        function bindSkyroomSaves() {
+            document.querySelectorAll('#userGroups [data-skyroom-save]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const username = btn.dataset.skyroomSave || '';
+                    const input = document.querySelector('#userGroups [data-skyroom="' + username.replace(/"/g, '') + '"]');
+                    await saveSkyroomUrl(username, input ? input.value : '');
+                });
+            });
+        }
+
+        async function refreshUsers() {
+            if (!isStaff()) return;
+            try {
+                const data = await Workshop.request('GET', '/api/admin/users');
+                const users = data.users || [];
+                const byName = (a, b) => String(a.username).localeCompare(String(b.username));
+                const mentors = users.filter(u => u.role === 'admin').sort(byName);
+                const voters = users.filter(u => u.role === 'student');
+                const claimed = new Set();
+                let html = '';
+                if (isOwner()) {
+                    mentors.forEach(m => {
+                        const kids = voters.filter(v => v.sponsor === m.username).sort(byName);
+                        kids.forEach(v => claimed.add(v.username));
+                        html += groupTableHtml(
+                            (m.name ? m.name + ' · ' : '') + m.username,
+                            'Mentor',
+                            [m].concat(kids),
+                            '',
+                            m.username,
+                            m.skyroom_url || ''
+                        );
+                    });
+                    const rest = voters.filter(v => !claimed.has(v.username)).sort(byName);
+                    if (rest.length) {
+                        html += groupTableHtml('Admin · Voters', 'Admin', rest, 'admin-head');
+                    }
+                    if (!html) html = '<div class="empty-state">هنوز Mentor یا Voterی نیست.</div>';
+                } else {
+                    const mine = users.filter(u => u.username === me.username);
+                    const kids = voters.filter(v => v.sponsor === me.username).sort(byName);
+                    html = groupTableHtml(
+                        (me.name || me.username),
+                        'Mentor',
+                        mine.concat(kids)
+                    ) || '<div class="empty-state">هنوز Voterی نیست.</div>';
+                }
+                document.getElementById('userGroups').innerHTML = html;
+                bindUserDeletes();
+                bindSkyroomSaves();
+                const ranked = users.slice().sort((a, b) => (b.points || 0) - (a.points || 0) || String(a.username).localeCompare(String(b.username)));
+                const total = ranked.reduce((sum, u) => sum + (u.points || 0), 0);
+                const board = document.getElementById('pointsBoard');
+                board.innerHTML = `
+                    <div class="card-header">
+                        <span>رتبه‌بندی</span>
+                        <span class="badge">${total} مجموع</span>
+                    </div>
+                    ${ranked.map((u, i) => `
+                        <div class="points-row">
+                            <span class="points-place">${i + 1}</span>
+                            <div class="points-who">
+                                <strong>${escapeHtml(u.name || u.username)}</strong>
+                                <span class="text-muted">${roleLabel(u.role)}${u.team ? ' · ' + escapeHtml(u.team) : ''}</span>
+                            </div>
+                            <span class="points-val">${u.points || 0}</span>
+                        </div>`).join('') || '<div class="empty-state">هنوز امتیازی نیست.</div>'}`;
+            } catch (err) {
+                document.getElementById('adminStatus').textContent = err.message || String(err);
+            }
+        }
+
+        function renderChrome() {
+            const leaf = current >= 0 ? leaves[current] : null;
+            const activeGroup = leaf ? leaf.group : currentGroup;
+            tabBar.innerHTML = GROUPS.map(g => {
+                const open = groupUnlocked(g);
+                const locked = !open;
+                const label = panelLabel(g);
+                const cls = [
+                    'tab-btn',
+                    g.id === activeGroup ? 'active' : '',
+                    locked ? 'locked' : '',
+                    locked && isStaff() ? 'admin-unlock' : ''
+                ].join(' ');
+                return `<span class="tab-wrap"><button class="${cls}" data-group="${g.id}">${label || '&nbsp;'}</button>${hideBtn(g.id, open)}</span>`;
+            }).join('') + `
+                <div class="tab-nav">
+                    <button id="prevTab" type="button">◀</button>
+                    <span class="tab-indicator">${current >= 0 ? current + 1 : '—'} / ${leaves.length}</span>
+                    <button id="nextTab" type="button">▶</button>
+                </div>`;
+            const group = GROUPS.find(g => g.id === activeGroup);
+            if (group && group.children) {
+                subTabBar.classList.remove('hidden');
+                subTabBar.innerHTML = group.children.map(c => {
+                    const open = isUnlocked(c.id);
+                    const locked = !open;
+                    const label = open ? c.label : '';
+                    const cls = [
+                        'sub-tab-btn',
+                        leaf && c.id === leaf.id ? 'active' : '',
+                        locked ? 'locked' : '',
+                        locked && isStaff() ? 'admin-unlock' : ''
+                    ].join(' ');
+                    return `<span class="sub-tab-wrap"><button class="${cls}" data-id="${c.id}">${label || '&nbsp;'}</button>${hideBtn(c.id, open)}</span>`;
+                }).join('');
+            } else {
+                subTabBar.classList.add('hidden');
+                subTabBar.innerHTML = '';
+            }
+            tabBar.querySelectorAll('[data-group]').forEach(btn => {
+                btn.addEventListener('click', () => onGroupClick(btn.dataset.group));
+            });
+            subTabBar.querySelectorAll('[data-id]').forEach(btn => {
+                btn.addEventListener('click', () => onLeafClick(btn.dataset.id));
+            });
+            document.querySelectorAll('[data-hide]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                    hidePanel(btn.dataset.hide);
+                });
+            });
+            document.getElementById('prevTab').addEventListener('click', () => step(-1));
+            document.getElementById('nextTab').addEventListener('click', () => step(1));
+        }
+
+        async function hidePanel(id) {
+            relatedHideIds(id).forEach(item => locallyHidden.add(item));
+            try {
+                const data = await Workshop.hide(id);
+                unlocked = Array.isArray(data.unlocked)
+                    ? data.unlocked.filter(x => !locallyHidden.has(x))
+                    : unlocked.filter(x => !locallyHidden.has(x));
+                const leaf = current >= 0 ? leaves[current] : null;
+                const viewingHidden = !!(leaf && (leaf.id === id || leaf.group === id || !isUnlocked(leaf.id)));
+                const viewingGroupHidden = current < 0 && currentGroup === id;
+                if (viewingHidden || viewingGroupHidden || !(unlocked || []).length) {
+                    showHome();
+                } else {
+                    renderChrome();
+                }
+            } catch (err) {
+                document.getElementById('adminStatus').textContent = err.message || String(err);
+            }
+        }
+
+        async function onGroupClick(id) {
+            const g = GROUPS.find(x => x.id === id);
+            if (!g) return;
+            if (g.children) {
+                if (!isStaff() && !groupUnlocked(g)) return;
+                if (isStaff()) {
+                    try {
+                        const data = await Workshop.unlock(g.id);
+                        applyUnlock(g.id, data.unlocked);
+                    } catch (e) {
+                        applyUnlock(g.id);
+                    }
+                }
+                current = -1;
+                currentGroup = g.id;
+                iframe.src = 'home.html';
+                iframe.style.height = '700px';
+                updateAppLogo();
+                renderChrome();
+                return;
+            }
+            await onLeafClick(g.id);
+        }
+
+        async function onLeafClick(id) {
+            const idx = leaves.findIndex(l => l.id === id);
+            if (idx < 0) return;
+            if (!isStaff() && !isUnlocked(id)) return;
+            if (id === 's4' || id === 's6') {
+                relatedHideIds(id).forEach(item => locallyHidden.delete(item));
+            }
+            if (isStaff()) {
+                try {
+                    const data = await Workshop.unlock(id);
+                    applyUnlock(id, data.unlocked);
+                } catch (e) {
+                    applyUnlock(id);
+                }
+            } else {
+                locallyHidden.delete(id);
+            }
+            switchTo(idx);
+        }
+
+        function step(dir) {
+            let idx;
+            if (current >= 0) {
+                idx = current + dir;
+            } else if (currentGroup) {
+                const start = leaves.findIndex(l => l.group === currentGroup);
+                idx = dir > 0 ? start : start - 1;
+            } else {
+                idx = dir > 0 ? 0 : -1;
+            }
+            while (idx >= 0 && idx < leaves.length) {
+                if (isUnlocked(leaves[idx].id)) {
+                    onLeafClick(leaves[idx].id);
+                    return;
+                }
+                idx += dir;
+            }
+        }
+
+        function stateLogoSrc(leaf) {
+            if (!leaf) return '';
+            const id = String(leaf.id || '');
+            const sub = id.match(/^s(\d+)-(\d+)$/);
+            if (sub) return 'state' + sub[1] + '.' + sub[2] + '.png';
+            const top = id.match(/^s(\d+)$/) || String(leaf.group || '').match(/^s(\d+)$/);
+            return top ? ('state' + top[1] + '.png') : '';
+        }
+
+        function updateAppLogo() {
+            const img = document.getElementById('appLogo');
+            const leaf = current >= 0 ? leaves[current] : null;
+            const src = stateLogoSrc(leaf);
+            if (!src) {
+                img.hidden = true;
+                img.removeAttribute('src');
+                img.alt = '';
+                return;
+            }
+            img.onload = () => { img.hidden = false; };
+            img.onerror = () => {
+                img.hidden = true;
+                img.removeAttribute('src');
+            };
+            if (img.getAttribute('src') === src) {
+                img.hidden = false;
+                return;
+            }
+            const sub = leaf ? String(leaf.id || '').match(/^s(\d+)-(\d+)$/) : null;
+            img.hidden = true;
+            img.alt = sub
+                ? ('لوگوی استیت ' + sub[1] + '.' + sub[2])
+                : ('لوگوی استیت ' + (String(leaf.group || '').replace(/^s/, '') || ''));
+            img.src = src;
+        }
+
+        function showHome() {
+            current = -1;
+            currentGroup = null;
+            iframe.src = 'home.html';
+            iframe.style.height = '700px';
+            updateAppLogo();
+            renderChrome();
+        }
+
+        function switchTo(index) {
+            if (index < 0 || index >= leaves.length) return;
+            current = index;
+            currentGroup = leaves[index].group;
+            iframe.src = leaves[index].file;
+            updateAppLogo();
+            renderChrome();
+        }
+
+        iframe.addEventListener('load', () => {
+            try {
+                const h = iframe.contentWindow.document.body.scrollHeight;
+                if (h > 100) iframe.style.height = Math.max(700, h + 40) + 'px';
+            } catch (e) { /* ignore */ }
+        });
+
+        document.getElementById('skyroomBtn').addEventListener('click', () => {
+            const url = (me && me.skyroom_url) || '';
+            if (!url) {
+                if (isStaff()) {
+                    document.getElementById('adminStatus').textContent = 'اول لینک اسکایروم را ذخیره کنید.';
+                    const accounts = document.getElementById('accountsBody');
+                    const toggle = document.getElementById('toggleAccounts');
+                    if (accounts && accounts.classList.contains('hidden')) toggle.click();
+                }
+                return;
+            }
+            window.open(url, '_blank', 'noopener,noreferrer');
+        });
+        document.getElementById('saveOwnSkyroomBtn').addEventListener('click', async () => {
+            await saveSkyroomUrl(isStaff() ? me.username : '', document.getElementById('ownSkyroomUrl').value);
+        });
+
+        document.getElementById('createAdminBtn').addEventListener('click', async () => {
+            const status = document.getElementById('adminStatus');
+            status.textContent = '';
+            try {
+                await Workshop.request('POST', '/api/admin/admins', {
+                    username: document.getElementById('newAdmin').value,
+                    password: document.getElementById('newAdminPass').value
+                });
+                document.getElementById('newAdmin').value = '';
+                document.getElementById('newAdminPass').value = '';
+                status.textContent = 'Mentor ساخته شد.';
+                refreshUsers();
+            } catch (err) {
+                status.textContent = err.message || String(err);
+            }
+        });
+        document.getElementById('createUserBtn').addEventListener('click', async () => {
+            const status = document.getElementById('adminStatus');
+            status.textContent = '';
+            try {
+                await Workshop.request('POST', '/api/admin/users', {
+                    username: document.getElementById('newUser').value,
+                    password: document.getElementById('newPass').value
+                });
+                document.getElementById('newUser').value = '';
+                document.getElementById('newPass').value = '';
+                status.textContent = 'Voter ساخته شد.';
+                refreshUsers();
+            } catch (err) {
+                status.textContent = err.message || String(err);
+            }
+        });
+        document.getElementById('resetWorkshopBtn').addEventListener('click', async () => {
+            const all = isOwner();
+            const msg = all
+                ? 'پنل‌های بازشده برای همه کلاس‌ها مخفی شوند؟ حساب‌های Mentor و Voter پاک نمی‌شوند.'
+                : 'پنل‌های بازشده کلاس شما مخفی شوند؟ حساب‌های Voter پاک نمی‌شوند.';
+            if (!confirm(msg)) return;
+            await Workshop.request('POST', '/api/admin/reset', {});
+            locallyHidden.clear();
+            unlocked = ['vote'];
+            showHome();
+            document.getElementById('adminStatus').textContent = all
+                ? 'پنل‌های همه کلاس‌ها بازنشانی شدند.'
+                : 'پنل‌های کلاس شما بازنشانی شدند.';
+            refreshUsers();
+        });
+        document.getElementById('resetVoteBtn').addEventListener('click', async () => {
+            if (!confirm('همهٔ رأی‌ها پاک شوند و نمودار نتیجه مخفی شود؟ بعد از این همه می‌توانند دوباره رأی بدهند.')) return;
+            try {
+                await Workshop.request('POST', '/api/vote/reset', {});
+                document.getElementById('adminStatus').textContent = 'رأی‌گیری از نو شروع شد. نتیجه مخفی است و همه می‌توانند رأی بدهند.';
+                const leaf = current >= 0 ? leaves[current] : null;
+                if (leaf && leaf.id === 'vote') {
+                    iframe.src = 'vote.html';
+                }
+            } catch (err) {
+                document.getElementById('adminStatus').textContent = err.message || String(err);
+            }
+        });
+
+        Workshop.startPolling((data, changed) => {
+            me = data.me;
+            unlocked = (Array.isArray(data.unlocked) ? data.unlocked : []).filter(id => !locallyHidden.has(id));
+            lobby = Array.isArray(data.lobby) ? data.lobby : [];
+            if (isStaff()) {
+                refreshLobby();
+                if (changed) refreshUsers();
+            }
+            if (!changed) return;
+            renderUser();
+            if (current >= 0 && !isStaff() && leaves[current] && !isUnlocked(leaves[current].id)) {
+                showHome();
+            } else {
+                renderChrome();
+            }
+        });
+
+        function bindFold(btnId, bodyId) {
+            const btn = document.getElementById(btnId);
+            const body = document.getElementById(bodyId);
+            btn.addEventListener('click', () => {
+                const closed = body.classList.toggle('hidden');
+                btn.classList.toggle('open', !closed);
+                btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+            });
+        }
+        bindFold('toggleAccounts', 'accountsBody');
+        bindFold('toggleLobby', 'lobbyBody');
+        bindFold('togglePoints', 'pointsBoard');
+    </script>
+</body>
+</html>

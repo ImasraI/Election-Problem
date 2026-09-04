@@ -1,0 +1,36 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: socialchoice2-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - ./redis-data:/data
+
+  redisrest:
+    build: ./shim
+    image: socialchoice2-redisrest:latest
+    container_name: socialchoice2-redisrest
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      REST_TOKEN: ${REDIS_REST_TOKEN}
+
+  web:
+    build: ./app
+    image: socialchoice2:latest
+    container_name: socialchoice2
+    restart: unless-stopped
+    depends_on:
+      - redisrest
+    env_file: .env
+    environment:
+      UPSTASH_REDIS_REST_URL: http://redisrest:8080
+      UPSTASH_REDIS_REST_TOKEN: ${REDIS_REST_TOKEN}
+    ports:
+      - "127.0.0.1:8027:8000"
+    volumes:
+      - ./data:/app/data
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "3"]

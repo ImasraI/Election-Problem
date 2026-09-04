@@ -8,11 +8,11 @@
 </head>
 <body>
     <div class="container">
-        <h2>استیت ۵ – ایده‌ها را با پنج شرط بسنجید</h2>
+        <div class="section-kicker">STATE 5</div>
+        <h2 class="cond-title">ایده‌ها را با پنج شرط بسنجید</h2>
         <div class="explain-panel">
-            <p>پنج شرط منطقی یک سیستم مطلوب: همیشه برنده، معیار کندورسه، اجماع، یکنوایی، و استقلال از گزینهٔ نامرتبط.</p>
-            <p>هر روش معروف دست‌کم یکی را نقض می‌کند؛ دیکتاتوری هر پنج را دارد اما رأی بقیه را نادیده می‌گیرد.</p>
-            <p>سؤال این است که آیا سیستم کاملی بدون دیکتاتور اصلاً وجود دارد.</p>
+            <p>هر روش با پنج شرط ارو ارزیابی می‌شود: همیشه برنده، کندورسه، اجماع، یکنوایی، استقلال.</p>
+            <p>منتور می‌تواند ایده‌های استیت ۱ را برای کلاس ارزیابی کند.</p>
         </div>
 
         <div class="card">
@@ -33,6 +33,7 @@
             <div class="card-header">
                 <span>ایده‌های استیت ۱</span>
                 <span class="badge" id="state1Count">۰ ایده</span>
+                <button class="outline reveal-names-btn hidden" id="revealNamesBtn" type="button">نمایش نام‌ها</button>
             </div>
             <p class="idea-note">این همان ایده‌هایی است که در استیت ۱ نوشته شده. Mentor می‌تواند هر کدام را ارزیابی کند تا برای رأی‌دهنده‌ها امتیاز و نمودار پنج شرط ساخته شود.</p>
             <div id="state1List"></div>
@@ -61,9 +62,20 @@
         let selectedId = '';
         let me = null;
         let processingId = '';
+        let namesRevealed = false;
 
         function isStaff(user) {
-            return user && (user.role === 'admin' || user.role === 'owner');
+            return M.isStaffUser(user);
+        }
+        function showName(item) {
+            const isOwn = me && item.username === me.username;
+            return M.maskedName(item.name || item.username, namesRevealed && isStaff(me), isOwn);
+        }
+        function who(idea) {
+            const namePart = namesRevealed && isStaff(me)
+                ? (idea.name || idea.username || '')
+                : (me && idea.username === me.username ? (idea.name || idea.username || '') : '●●●●');
+            return `${namePart} · ${idea.team || 'بدون تیم'} · ${idea.points || 0} امتیاز`;
         }
         function quotaUsed() {
             return !!(me && me.role === 'student' && me.used_state5);
@@ -71,9 +83,6 @@
         function hasFailed(idea) {
             if (!idea || !idea.criteria || idea.criteria.valid === false) return false;
             return Object.entries(idea.criteria).some(([k, v]) => k !== 'valid' && !v);
-        }
-        function who(idea) {
-            return `${idea.name || idea.username || ''} · ${idea.team || 'بدون تیم'} · ${idea.points || 0} امتیاز`;
         }
         function alreadyScored(item) {
             if (!item) return false;
@@ -127,6 +136,11 @@
 
         function renderState1() {
             state1Count.textContent = state1Ideas.length + ' ایده';
+            const revealBtn = document.getElementById('revealNamesBtn');
+            if (revealBtn) {
+                revealBtn.classList.toggle('hidden', !isStaff(me));
+                revealBtn.textContent = namesRevealed ? 'مخفی کردن نام‌ها' : 'نمایش نام‌ها';
+            }
             if (!state1Ideas.length) {
                 state1List.innerHTML = '<div class="empty-state">هنوز ایده‌ای در استیت ۱ ثبت نشده است.</div>';
                 return;
@@ -152,7 +166,7 @@
                 <div class="idea-item ${linked ? 'active' : ''}" data-s1="${i}">
                     <span class="badge">${i + 1}</span>
                     <div class="idea-text">
-                        <strong>${M.escapeHtml(item.name || item.username)}</strong>
+                        <strong>${showName(item)}</strong>
                         <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
                         <div>${M.escapeHtml(item.text || '')}</div>
                     </div>
@@ -198,7 +212,7 @@
                 <div class="idea-item ${item.id === selectedId ? 'active' : ''}" data-select="${i}">
                     <span class="badge">${i + 1}</span>
                     <div class="idea-text">
-                        <strong>${M.escapeHtml(item.name || item.username)}</strong>
+                        <strong>${showName(item)}</strong>
                         <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
                         <div>${M.escapeHtml(item.text || '')}</div>
                     </div>
@@ -353,6 +367,11 @@
                 statusEl.textContent = err.message || String(err);
             }
         }
+
+        document.getElementById('revealNamesBtn').addEventListener('click', () => {
+            namesRevealed = !namesRevealed;
+            render();
+        });
 
         Workshop.startPolling((data, changed) => {
             me = data.me;

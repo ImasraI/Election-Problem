@@ -9,6 +9,7 @@ import threading
 import time
 from copy import deepcopy
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -48,6 +49,7 @@ PBKDF2_ROUNDS = 120_000
 CRITERIA_KEYS = ["AAW", "CWC", "UNAN", "MONO", "IIA"]
 POINTS_PER_CRITERION = 10
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{2,32}$")
+SKYROOM_URL_MAX = 500
 
 _thread_lock = threading.Lock()
 
@@ -165,6 +167,29 @@ PANEL_IDS = [
 ]
 
 
+def _id_list(val) -> list:
+    if val is None:
+        return []
+    return list(val)
+
+
+def _full_staff_unlock(unlocked) -> bool:
+    have = set(_id_list(unlocked))
+    all_ids = set(PANEL_IDS)
+    return all_ids <= have or (all_ids - {"s6-6"}) <= have
+
+
+def _collapse_legacy_staff_unlock(user: dict) -> bool:
+    """Mentors used to start with every PANEL_ID. That set is ignored for
+    tab names, so clicks never became visible. Fold it back to vote-only."""
+    if not user or user.get("role") != "admin":
+        return False
+    if not _full_staff_unlock(user.get("unlocked")):
+        return False
+    user["unlocked"] = ["vote"]
+    return True
+
+
 def is_owner(user) -> bool:
     return (user or {}).get("role") == "owner"
 
@@ -210,6 +235,8 @@ def _blank() -> dict:
         "vote_display": [],
         "votes": {},
         "state1_ideas": [],
+        "lobby": [],
+        "lobby_pulled": {},
         "arrows": default_arrows(),
         "users": {
             "admin": {
@@ -223,6 +250,7 @@ def _blank() -> dict:
                 "used_state1": False,
                 "sponsor": "",
                 "unlocked": ["vote"],
+                "skyroom_url": "",
             }
         },
         "sessions": {},
@@ -239,6 +267,8 @@ def _normalize(data: dict) -> dict:
     data.setdefault("votes", {})
     data.setdefault("ideas", [])
     data.setdefault("state1_ideas", [])
+    data.setdefault("lobby", [])
+    data.setdefault("lobby_pulled", {})
     data.setdefault("arrows", default_arrows())
     data.setdefault("users", {})
     data.setdefault("sessions", {})
@@ -250,13 +280,19 @@ def _normalize(data: dict) -> dict:
         data["users"]["admin"] = _blank()["users"]["admin"]
     for user in data["users"].values():
         user.setdefault("sponsor", "")
-        user.setdefault("unlocked", ["vote"] if user.get("role") == "student" else list(PANEL_IDS))
+        user.setdefault("skyroom_url", "")
+        user.setdefault(
+            "unlocked",
+            list(PANEL_IDS) if user.get("role") == "owner" else ["vote"],
+        )
         user.setdefault("hidden", [])
-        if user.get("role") in ("owner", "admin"):
+        if user.get("role") == "owner":
             have = set(user.get("unlocked") or [])
             prev = set(PANEL_IDS) - {"s6-6"}
             if prev <= have and "s6-6" not in have:
                 user["unlocked"] = list(user["unlocked"]) + ["s6-6"]
+        if _collapse_legacy_staff_unlock(user):
+            data["_persist"] = True
         if user.get("role") == "admin" and user.get("username") == "admin":
             user["role"] = "owner"
         if user.get("role") == "owner" and user.get("name") == "مالک":
@@ -283,7 +319,7 @@ def _load() -> dict:
             _dump(data)
             return data
         data = _normalize(data)
-        if data.pop("_persist_admin_pw", False):
+        if data.pop("_persist_admin_pw", False) or data.pop("_persist", False):
             _dump(data)
         return data
     if not DATA_PATH.is_file():
@@ -297,7 +333,7 @@ def _load() -> dict:
         _dump(data)
         return data
     data = _normalize(data)
-    if data.pop("_persist_admin_pw", False):
+    if data.pop("_persist_admin_pw", False) or data.pop("_persist", False):
         _dump(data)
     return data
 
@@ -368,7 +404,32 @@ def _public_user(user: dict) -> dict:
         "points": int(user.get("points") or 0),
         "used_state5": bool(user.get("used_state5")),
         "used_state1": bool(user.get("used_state1")),
+        "skyroom_url": user.get("skyroom_url") or "",
     }
+
+
+def _normalize_skyroom_url(raw: str) -> str:
+    raw = (raw or "").strip()
+    if not raw:
+        return ""
+    if len(raw) > SKYROOM_URL_MAX:
+        raise ValueError("لینک اسکایروم خیلی بلند است.")
+    if "://" not in raw:
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("لینک اسکایروم باید یک آدرس http یا https باشد.")
+    return raw
+
+
+def _resolved_skyroom_url(data: dict, user: dict) -> str:
+    if not user:
+        return ""
+    holder = user
+    if user.get("role") == "student":
+        sponsor = (user.get("sponsor") or "").strip()
+        holder = (data.get("users") or {}).get(sponsor) or {}
+    return (holder.get("skyroom_url") or "").strip()
 
 
 def token_from_headers(headers) -> str:
@@ -461,7 +522,8 @@ def create_student(actor: dict, username: str, password: str) -> dict:
             "used_state5": False,
             "used_state1": False,
             "sponsor": actor["username"],
-            "unlocked": _id_list(data.get("unlocked")),
+            "unlocked": _audience_unlocked(data, actor),
+            "skyroom_url": "",
         }
         _bump(data)
         _dump(data)
@@ -494,7 +556,8 @@ def create_admin(actor: dict, username: str, password: str) -> dict:
             "used_state5": False,
             "used_state1": False,
             "sponsor": actor["username"],
-            "unlocked": list(PANEL_IDS),
+            "unlocked": ["vote"],
+            "skyroom_url": "",
         }
         _bump(data)
         _dump(data)
@@ -544,6 +607,26 @@ def list_users(actor: dict) -> list:
         return users
 
 
+def set_skyroom_url(actor: dict, url: str, username: str = "") -> str:
+    if not is_staff(actor):
+        raise PermissionError("فقط Mentor یا Admin می‌تواند لینک اسکایروم را عوض کند.")
+    url = _normalize_skyroom_url(url)
+    target = (username or "").strip() or actor["username"]
+    with _lock:
+        data = _load()
+        user = data["users"].get(target)
+        if not user:
+            raise ValueError("حساب پیدا نشد.")
+        if user.get("role") not in ("owner", "admin"):
+            raise ValueError("لینک اسکایروم برای Mentor یا Admin تنظیم می‌شود.")
+        if is_admin(actor) and target != actor["username"]:
+            raise PermissionError("فقط لینک کلاس خودتان را می‌توانید عوض کنید.")
+        user["skyroom_url"] = url
+        _bump(data)
+        _dump(data)
+        return url
+
+
 def _related_ids(panel_id: str, hiding: bool = False) -> list:
     ids = [panel_id]
     if panel_id.startswith("s4-"):
@@ -555,12 +638,6 @@ def _related_ids(panel_id: str, hiding: bool = False) -> list:
     if hiding and panel_id == "s6":
         ids.extend([p for p in PANEL_IDS if p.startswith("s6")])
     return list(dict.fromkeys(ids))
-
-
-def _id_list(val) -> list:
-    if val is None:
-        return []
-    return list(val)
 
 
 def _effective_unlocked(data: dict, user: dict) -> list:
@@ -575,12 +652,16 @@ def _audience_unlocked(data: dict, actor: dict) -> list:
     if is_owner(actor):
         return sorted(set(_id_list(data.get("unlocked"))) - blocked)
     if is_admin(actor):
+        _collapse_legacy_staff_unlock(actor)
         shown = set()
         found = False
         for user in data["users"].values():
             if user.get("role") == "student" and user.get("sponsor") == actor["username"]:
                 found = True
                 shown.update(_effective_unlocked(data, user))
+        personal = set(_id_list(actor.get("unlocked")))
+        if personal and not _full_staff_unlock(personal):
+            shown.update(personal)
         if not found:
             shown.update(_id_list(data.get("unlocked")))
         shown -= blocked
@@ -632,6 +713,7 @@ def unlock_panel(actor: dict, panel_id: str) -> list:
                 if user.get("role") == "student":
                     _grant_user(user, extras)
         else:
+            _collapse_legacy_staff_unlock(stored)
             _grant_user(stored, extras)
             for user in data["users"].values():
                 if user.get("role") == "student" and user.get("sponsor") == actor["username"]:
@@ -661,6 +743,7 @@ def hide_panel(actor: dict, panel_id: str) -> list:
                 if user.get("role") == "student":
                     _revoke_user(user, extras)
         else:
+            _collapse_legacy_staff_unlock(stored)
             _revoke_user(stored, extras)
             for user in data["users"].values():
                 if user.get("role") == "student" and user.get("sponsor") == actor["username"]:
@@ -1041,6 +1124,7 @@ def delete_idea(actor: dict, idea_id: str, source: str = "") -> dict:
 
 
 def reset_workshop(actor: dict) -> None:
+    """Reset panel visibility only — does NOT delete users or accounts."""
     if not is_staff(actor):
         raise PermissionError("فقط Mentor یا Admin.")
     with _lock:
@@ -1051,15 +1135,21 @@ def reset_workshop(actor: dict) -> None:
             data["unlocked"] = ["vote"]
             data["hidden"] = []
             for user in data["users"].values():
+                # Only reset panel visibility — keep all accounts intact
                 if user.get("role") == "student":
                     user["unlocked"] = ["vote"]
                     user["hidden"] = []
                 elif user.get("role") == "admin":
+                    user["unlocked"] = ["vote"]
+                    user["hidden"] = []
+                # owner (admin account) keeps full panel access
+                elif user.get("role") == "owner":
                     user["hidden"] = []
         else:
             mine = actor["username"]
             stored = data["users"].get(mine)
             if stored:
+                stored["unlocked"] = ["vote"]
                 stored["hidden"] = []
             for user in data["users"].values():
                 if user.get("role") == "student" and user.get("sponsor") == mine:
@@ -1067,6 +1157,146 @@ def reset_workshop(actor: dict) -> None:
                     user["hidden"] = []
         _bump(data)
         _dump(data)
+
+
+# ── Lobby ────────────────────────────────────────────────────────────────────
+
+def join_lobby(name: str, group: str) -> dict:
+    """Add a participant to the lobby (no password needed)."""
+    name = (name or "").strip()
+    group = (group or "").strip()
+    if not name:
+        raise ValueError("نام را وارد کنید.")
+    if not group:
+        raise ValueError("گروه را وارد کنید.")
+    entry = {
+        "id": secrets.token_hex(8),
+        "name": name,
+        "group": group,
+        "joined_at": time.time(),
+    }
+    with _lock:
+        data = _load()
+        lobby = list(data.get("lobby") or [])
+        # Prevent duplicate names in same group
+        existing = next((e for e in lobby if e.get("name") == name and e.get("group") == group), None)
+        if existing:
+            # Return the existing token so the browser can re-identify
+            return {"entry": existing, "token": existing.get("token") or entry["id"]}
+        entry["token"] = secrets.token_urlsafe(24)
+        lobby.append(entry)
+        data["lobby"] = lobby
+        data.setdefault("lobby_pulled", {})
+        _bump(data)
+        _dump(data)
+    return {"entry": entry, "token": entry["token"]}
+
+
+def list_lobby(actor: dict) -> list:
+    if not is_staff(actor):
+        raise PermissionError("فقط Mentor یا Admin می‌تواند لابی را ببیند.")
+    with _lock:
+        data = _load()
+        return list(data.get("lobby") or [])
+
+
+def pull_from_lobby(actor: dict, lobby_id: str) -> dict:
+    """Mentor pulls a lobby participant into their class (creates a voter account)."""
+    if not is_staff(actor):
+        raise PermissionError("فقط Mentor یا Admin می‌تواند شرکت‌کننده را وارد کلاس کند.")
+    lobby_id = (lobby_id or "").strip()
+    with _lock:
+        data = _load()
+        lobby = list(data.get("lobby") or [])
+        entry = next((e for e in lobby if e.get("id") == lobby_id), None)
+        if not entry:
+            raise ValueError("شرکت‌کننده در لابی پیدا نشد.")
+        name = entry.get("name") or ""
+        group = entry.get("group") or ""
+        # Build a safe username from name + random suffix
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", name)[:20] or "voter"
+        base = safe
+        suffix = 1
+        while base in data["users"]:
+            base = f"{safe}_{suffix}"
+            suffix += 1
+        username = base
+        password_plain = secrets.token_urlsafe(10)
+        data["users"][username] = {
+            "username": username,
+            "password": _hash_password(password_plain),
+            "role": "student",
+            "name": name,
+            "team": group,
+            "points": 0,
+            "used_state5": False,
+            "used_state1": False,
+            "sponsor": actor["username"],
+            "unlocked": _audience_unlocked(data, actor),
+            "skyroom_url": "",
+        }
+        # Remove from lobby but remember session for waiting client
+        lobby_token = entry.get("token") or ""
+        token = secrets.token_urlsafe(32)
+        data.setdefault("lobby_pulled", {})[lobby_token] = token
+        data["lobby"] = [e for e in lobby if e.get("id") != lobby_id]
+        data["sessions"][token] = {
+            "username": username,
+            "exp": time.time() + SESSION_TTL,
+        }
+        created_user = deepcopy(data["users"][username])
+        _bump(data)
+        _dump(data)
+        return {
+            "user": _public_user(created_user),
+            "token": token,
+            "username": username,
+            "password": password_plain,
+        }
+
+
+def remove_from_lobby(actor: dict, lobby_id: str) -> dict:
+    """Mentor removes a participant from the lobby."""
+    if not is_staff(actor):
+        raise PermissionError("فقط Mentor یا Admin می‌تواند شرکت‌کننده را از لابی حذف کند.")
+    lobby_id = (lobby_id or "").strip()
+    with _lock:
+        data = _load()
+        lobby = list(data.get("lobby") or [])
+        if not any(e.get("id") == lobby_id for e in lobby):
+            raise ValueError("شرکت‌کننده در لابی پیدا نشد.")
+        data["lobby"] = [e for e in lobby if e.get("id") != lobby_id]
+        _bump(data)
+        _dump(data)
+    return {"ok": True}
+
+
+def lobby_snapshot(token: str) -> dict:
+    """Return lobby entry status for a waiting participant."""
+    if not token:
+        raise ValueError("توکن لازم است.")
+    with _lock:
+        data = _load()
+        # Check if mentor pulled this lobby token into a session
+        session_token = (data.get("lobby_pulled") or {}).get(token)
+        if session_token:
+            session = data["sessions"].get(session_token)
+            if session:
+                user = data["users"].get(session.get("username"))
+                if user:
+                    return {"status": "pulled", "token": session_token, "user": _public_user(user)}
+        # Check if this token is already a live session
+        session = data["sessions"].get(token)
+        if session:
+            user = data["users"].get(session.get("username"))
+            if user:
+                return {"status": "pulled", "token": token, "user": _public_user(user)}
+        # Check if still in lobby
+        lobby = data.get("lobby") or []
+        entry = next((e for e in lobby if e.get("token") == token), None)
+        if entry:
+            return {"status": "waiting", "entry": entry}
+        return {"status": "removed"}
 
 
 def snapshot(user: dict) -> dict:
@@ -1083,15 +1313,19 @@ def snapshot(user: dict) -> dict:
                 _dump(data)
             votes = list(data.get("vote_display") or [])
         unlocked = _audience_unlocked(data, stored)
+        lobby = list(data.get("lobby") or []) if is_staff(stored) else []
+        me = _public_user(stored)
+        me["skyroom_url"] = _resolved_skyroom_url(data, stored)
         return {
             "version": data.get("version") or 0,
-            "me": _public_user(stored),
+            "me": me,
             "unlocked": unlocked,
             "vote_revealed": bool(data.get("vote_revealed")),
             "my_vote": (data.get("votes") or {}).get(user["username"]),
             "votes": votes,
             "ideas": _class_ideas(data, stored, data.get("ideas") or []),
             "state1_ideas": _class_ideas(data, stored, data.get("state1_ideas") or []),
+            "lobby": lobby,
             "store": store_kind(),
             "live": live_classroom_ok(),
         }

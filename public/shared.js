@@ -1,8 +1,6 @@
 /* shared voting helpers + drag ranking widget */
 (function (global) {
-    const CANDIDATES = ['A', 'B', 'C'];
-    const MAX_VOTERS = 6;
-    const RANK3 = ['A>B>C', 'A>C>B', 'B>A>C', 'B>C>A', 'C>A>B', 'C>B>A'];
+    const CANDIDATES = ['A', 'B', 'C', 'D', 'E'];
     const NAME_POOL = 'ABCDEFGHJKLMNOPQRSTUVWXYZ'.split('');
     const COLOR_LIST = [
         '#d45d5d', '#3d8c7a', '#3b7fa8', '#c9842a', '#7c5cbf',
@@ -12,8 +10,6 @@
     const COLORS = { A: '#d45d5d', B: '#3d8c7a', C: '#3b7fa8', D: '#c9842a', E: '#7c5cbf', F: '#2f9e8f', G: '#c45c8a', H: '#4a7c59', X: '#c9842a' };
     const CYCLE_PALETTE = ['#ff5d7d', '#f9b44a', '#39d3ff', '#c084fc', '#4ade80', '#fb7185', '#22d3ee', '#f472b6'];
     const MEDALS = ['۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸'];
-    const IDEA_KEY = 'mentor-ideas';
-
     function candidateColor(c) {
         if (COLORS[c]) return COLORS[c];
         const i = Math.max(0, NAME_POOL.indexOf(c));
@@ -37,32 +33,20 @@
         return out;
     }
     function cyclicVoters(cands) {
-        cands = (cands || CANDIDATES).slice(0, MAX_VOTERS);
-        if (cands.length <= 3) {
-            return expandGroups([
-                { n: 2, rank: 'A>B>C' },
-                { n: 2, rank: 'B>C>A' },
-                { n: 2, rank: 'C>A>B' }
-            ]);
-        }
+        cands = cands || CANDIDATES;
         return cands.map((_, i) => cands.slice(i).concat(cands.slice(0, i)).join('>'));
     }
     function condorcetWinnerVoters(cands, winner) {
         cands = (cands || CANDIDATES).slice();
         winner = winner || cands[0];
         const rest = cands.filter(c => c !== winner);
+        const voters = [];
         const top = [winner].concat(rest).join('>');
-        if (!rest.length) return [top];
-        const second = [rest[0], winner].concat(rest.slice(1)).join('>');
-        if (rest.length === 1) {
-            return expandGroups([{ n: 4, rank: top }, { n: 2, rank: second }]);
-        }
-        const third = [rest[1], winner].concat(rest.filter(x => x !== rest[1])).join('>');
-        return expandGroups([
-            { n: 3, rank: top },
-            { n: 2, rank: second },
-            { n: 1, rank: third }
-        ]);
+        for (let i = 0; i < rest.length + 2; i++) voters.push(top);
+        rest.forEach(r => {
+            voters.push([r, winner].concat(rest.filter(x => x !== r)).join('>'));
+        });
+        return voters;
     }
     function emptyCounts(cands) {
         const counts = {};
@@ -284,35 +268,152 @@
         return true;
     }
 
-    function drawArrow(ctx, x1, y1, x2, y2, color, lineWidth) {
+    function graphSurface(canvas) {
+        const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
+        const attrW = parseInt(canvas.getAttribute('width'), 10) || 420;
+        const attrH = parseInt(canvas.getAttribute('height'), 10) || 420;
+        const cssW = canvas.clientWidth > 24 ? canvas.clientWidth : attrW;
+        const cssH = canvas.clientHeight > 24 ? canvas.clientHeight : attrH;
+        const bw = Math.max(1, Math.round(cssW * dpr));
+        const bh = Math.max(1, Math.round(cssH * dpr));
+        if (canvas.width !== bw || canvas.height !== bh) {
+            canvas.width = bw;
+            canvas.height = bh;
+        }
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { ctx, W: cssW, H: cssH };
+    }
+
+    function drawScorePill(ctx, x, y, text, color) {
+        ctx.save();
+        ctx.font = '700 12px Vazirmatn, Tahoma, sans-serif';
+        const padX = 9, h = 22;
+        const w = ctx.measureText(text).width + padX * 2;
+        const left = x - w / 2, top = y - h / 2;
+        ctx.beginPath();
+        const r = 11;
+        ctx.moveTo(left + r, top);
+        ctx.arcTo(left + w, top, left + w, top + h, r);
+        ctx.arcTo(left + w, top + h, left, top + h, r);
+        ctx.arcTo(left, top + h, left, top, r);
+        ctx.arcTo(left, top, left + w, top, r);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(8, 12, 24, .96)';
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+        ctx.fillStyle = '#f4f7fb';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, x, y + 0.5);
+        ctx.restore();
+    }
+
+    function drawChevron(ctx, x, y, angle, size, color) {
+        const spread = 0.72;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2.6, size * 0.24);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(x - size * Math.cos(angle - spread), y - size * Math.sin(angle - spread));
+        ctx.lineTo(x, y);
+        ctx.lineTo(x - size * Math.cos(angle + spread), y - size * Math.sin(angle + spread));
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawArrowHead(ctx, tipX, tipY, angle, size, color) {
+        const spread = 0.52;
+        const p0 = { x: tipX, y: tipY };
+        const p1 = {
+            x: tipX - size * Math.cos(angle - spread),
+            y: tipY - size * Math.sin(angle - spread)
+        };
+        const p2 = {
+            x: tipX - size * Math.cos(angle + spread),
+            y: tipY - size * Math.sin(angle + spread)
+        };
+        const pts = [p0, p1, p2];
+        const n = pts.length;
+        const radius = Math.max(3.5, size * 0.16);
+        ctx.save();
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+            const prev = pts[(i + n - 1) % n];
+            const curr = pts[i];
+            const next = pts[(i + 1) % n];
+            const v1x = curr.x - prev.x, v1y = curr.y - prev.y;
+            const v2x = next.x - curr.x, v2y = next.y - curr.y;
+            const l1 = Math.hypot(v1x, v1y) || 1;
+            const l2 = Math.hypot(v2x, v2y) || 1;
+            const r = Math.min(radius, l1 / 2.5, l2 / 2.5);
+            const sx = curr.x - (v1x / l1) * r;
+            const sy = curr.y - (v1y / l1) * r;
+            const ex = curr.x + (v2x / l2) * r;
+            const ey = curr.y + (v2y / l2) * r;
+            if (i === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx, sy);
+            ctx.quadraticCurveTo(curr.x, curr.y, ex, ey);
+        }
+        ctx.closePath();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function drawArrow(ctx, x1, y1, x2, y2, color, lineWidth, nodeR) {
         lineWidth = lineWidth || 3.5;
+        nodeR = nodeR || 26;
         const dx = x2 - x1, dy = y2 - y1;
         const len = Math.sqrt(dx * dx + dy * dy);
         if (len < 1) return;
         const ux = dx / len, uy = dy / len;
-        const shrink = 26;
-        const startX = x1 + ux * shrink, startY = y1 + uy * shrink;
-        const endX = x2 - ux * shrink, endY = y2 - uy * shrink;
+        const angle = Math.atan2(uy, ux);
+        const headSize = 26 + lineWidth * 0.5;
+        const startX = x1 + ux * (nodeR + 5);
+        const startY = y1 + uy * (nodeR + 5);
+        const tipX = x2 - ux * (nodeR + 8);
+        const tipY = y2 - uy * (nodeR + 8);
+        const shaftEndX = tipX - ux * (headSize * 0.72);
+        const shaftEndY = tipY - uy * (headSize * 0.72);
+        const half = Math.max(2.4, lineWidth * 0.6);
+        const nx = -uy, ny = ux;
+
         ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = lineWidth;
-        ctx.shadowColor = color + '50';
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
         ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-        const angle = Math.atan2(endY - startY, endX - startX);
-        const headLen = 14, headAngle = 0.45;
-        ctx.fillStyle = color;
-        ctx.shadowColor = 'transparent';
-        ctx.beginPath();
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - headLen * Math.cos(angle - headAngle), endY - headLen * Math.sin(angle - headAngle));
-        ctx.lineTo(endX - headLen * Math.cos(angle + headAngle), endY - headLen * Math.sin(angle + headAngle));
+        ctx.moveTo(startX + nx * half, startY + ny * half);
+        ctx.lineTo(shaftEndX + nx * half * 0.75, shaftEndY + ny * half * 0.75);
+        ctx.lineTo(shaftEndX - nx * half * 0.75, shaftEndY - ny * half * 0.75);
+        ctx.lineTo(startX - nx * half, startY - ny * half);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+
+        const shaftLen = Math.hypot(shaftEndX - startX, shaftEndY - startY);
+        if (shaftLen > 40) {
+            drawChevron(ctx, startX + ux * shaftLen * 0.36, startY + uy * shaftLen * 0.36, angle, 12, color);
+            if (shaftLen > 70) {
+                drawChevron(ctx, startX + ux * shaftLen * 0.58, startY + uy * shaftLen * 0.58, angle, 12, color);
+            }
+        }
+
+        return {
+            mx: (startX + shaftEndX) / 2,
+            my: (startY + shaftEndY) / 2,
+            ux, uy,
+            head: { tipX, tipY, angle, size: headSize, color }
+        };
     }
 
     function layoutPositions(cands, cx, cy, radius) {
@@ -326,20 +427,46 @@
     }
 
     function drawGraph(canvas, counts, opts) {
+        if (!canvas || typeof canvas.getContext !== 'function') return;
         opts = opts || {};
+        canvas.__lastGraph = { counts: counts || null, opts: opts };
+        if (canvas.__drawing) return;
+        canvas.__drawing = true;
+        try {
+        if (!canvas.__graphRo && typeof ResizeObserver !== 'undefined') {
+            let lastW = 0, lastH = 0;
+            canvas.__graphRo = new ResizeObserver(() => {
+                const w = canvas.clientWidth, h = canvas.clientHeight;
+                if (w < 24 || h < 24) return;
+                if (w === lastW && h === lastH) return;
+                lastW = w;
+                lastH = h;
+                const last = canvas.__lastGraph;
+                if (last) drawGraph(canvas, last.counts, last.opts);
+            });
+            canvas.__graphRo.observe(canvas.parentElement || canvas);
+        }
         const cands = opts.candidates || CANDIDATES;
-        const ctx = canvas.getContext('2d');
-        const W = canvas.width, H = canvas.height;
+        const { ctx, W, H } = graphSurface(canvas);
         ctx.clearRect(0, 0, W, H);
+
+        const bg = ctx.createRadialGradient(W / 2, H / 2, 8, W / 2, H / 2, Math.max(W, H) * 0.62);
+        bg.addColorStop(0, 'rgba(18, 36, 58, .55)');
+        bg.addColorStop(1, 'rgba(6, 10, 20, .15)');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, W, H);
+
         if (!counts) {
             ctx.fillStyle = '#93a5c2';
-            ctx.font = '16px Vazirmatn, sans-serif';
+            ctx.font = '16px Vazirmatn, Tahoma, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(opts.emptyText || 'رأی اضافه کنید', W / 2, H / 2);
             return;
         }
-        const radius = Math.min(W, H) * (0.30 + Math.min(cands.length, 8) * 0.008);
+
+        const nodeR = cands.length > 5 ? 20 : 24;
+        const radius = Math.min(W, H) * (0.28 + Math.min(cands.length, 8) * 0.01);
         const pos = layoutPositions(cands, W / 2, H / 2, radius);
         const cycles = findCycles(counts, cands);
         const edgeCycles = {};
@@ -351,69 +478,99 @@
                 edgeCycles[k].push(idx);
             }
         });
+        const totalVoters = Math.max(1, ...cands.flatMap((a, i) =>
+            cands.slice(i + 1).map(b => {
+                const r = getResult(counts, a, b);
+                return (r.ca || 0) + (r.cb || 0);
+            })
+        ));
 
+        const labels = [];
+        const heads = [];
         for (let i = 0; i < cands.length; i++) {
             for (let j = i + 1; j < cands.length; j++) {
                 const a = cands[i], b = cands[j];
                 const r = getResult(counts, a, b);
+                const pA = pos[a], pB = pos[b];
+                if (!pA || !pB) continue;
                 if (!r.winner) {
+                    ctx.save();
                     ctx.beginPath();
                     ctx.setLineDash([5, 5]);
-                    ctx.strokeStyle = 'rgba(255,255,255,.28)';
-                    ctx.lineWidth = 1.5;
-                    ctx.moveTo(pos[a].x, pos[a].y);
-                    ctx.lineTo(pos[b].x, pos[b].y);
+                    ctx.strokeStyle = 'rgba(255,255,255,.32)';
+                    ctx.lineWidth = 1.6;
+                    ctx.moveTo(pA.x, pA.y);
+                    ctx.lineTo(pB.x, pB.y);
                     ctx.stroke();
                     ctx.setLineDash([]);
+                    ctx.restore();
+                    labels.push({
+                        x: (pA.x + pB.x) / 2,
+                        y: (pA.y + pB.y) / 2,
+                        text: r.ca === r.cb && r.ca ? `${r.ca}–${r.cb}` : 'مساوی',
+                        color: 'rgba(200,210,230,.9)'
+                    });
+                    continue;
                 }
-            }
-        }
-        for (let i = 0; i < cands.length; i++) {
-            for (let j = i + 1; j < cands.length; j++) {
-                const a = cands[i], b = cands[j];
-                const r = getResult(counts, a, b);
-                if (!r.winner) continue;
                 const from = r.winner, to = r.loser;
                 const p1 = pos[from], p2 = pos[to];
-                if (!p1 || !p2) continue;
+                const winN = from === a ? r.ca : r.cb;
+                const loseN = from === a ? r.cb : r.ca;
+                const margin = Math.max(1, winN - loseN);
                 const k = from + '>' + to;
                 const members = edgeCycles[k] || [];
                 const isHl = opts.highlightWinner && from === opts.highlightWinner;
-                if (!members.length) {
-                    const col = isHl ? '#6ee7b7' : candidateColor(from);
-                    drawArrow(ctx, p1.x, p1.y, p2.x, p2.y, col, isHl ? 5 : 3.2);
-                    continue;
+                const col = members.length
+                    ? CYCLE_PALETTE[members[0] % CYCLE_PALETTE.length]
+                    : (isHl ? '#6ee7b7' : candidateColor(from));
+                const width = 2.4 + Math.min(5, (margin / totalVoters) * 14);
+                const mid = drawArrow(ctx, p1.x, p1.y, p2.x, p2.y, col, isHl ? width + 1.2 : width, nodeR);
+                if (mid) {
+                    if (mid.head) heads.push(mid.head);
+                    const nx = -mid.uy, ny = mid.ux;
+                    labels.push({
+                        x: mid.mx + nx * 22,
+                        y: mid.my + ny * 22,
+                        text: `${from} → ${to}  ${winN}–${loseN}`,
+                        color: col
+                    });
                 }
-                const dx = p2.x - p1.x, dy = p2.y - p1.y;
-                const len = Math.sqrt(dx * dx + dy * dy) || 1;
-                const px = -dy / len, py = dx / len;
-                members.forEach((ci, m) => {
-                    const shift = (m - (members.length - 1) / 2) * 8;
-                    drawArrow(
-                        ctx,
-                        p1.x + px * shift, p1.y + py * shift,
-                        p2.x + px * shift, p2.y + py * shift,
-                        CYCLE_PALETTE[ci % CYCLE_PALETTE.length],
-                        members.length > 1 ? 2.6 : 3.4
-                    );
-                });
             }
         }
+
         for (const c of cands) {
             const p = pos[c];
             const isW = opts.highlightWinner === c;
+            const rad = isW ? nodeR + 3 : nodeR;
+            ctx.save();
+            if (isW) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, rad + 9, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(110, 231, 183, .35)';
+                ctx.lineWidth = 8;
+                ctx.stroke();
+            }
             ctx.beginPath();
-            ctx.arc(p.x, p.y, isW ? 26 : 22, 0, 2 * Math.PI);
+            ctx.arc(p.x, p.y, rad, 0, 2 * Math.PI);
+            ctx.shadowColor = 'rgba(0,0,0,.45)';
+            ctx.shadowBlur = 12;
             ctx.fillStyle = isW ? '#6ee7b7' : candidateColor(c);
             ctx.fill();
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = isW ? 4 : 3;
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(255,255,255,.92)';
+            ctx.lineWidth = isW ? 3.5 : 2.4;
             ctx.stroke();
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 16px Vazirmatn, sans-serif';
+            ctx.fillStyle = isW ? '#052016' : '#fff';
+            ctx.font = `bold ${isW ? 18 : 16}px Vazirmatn, Tahoma, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(c, p.x, p.y + 1);
+            ctx.restore();
+        }
+        heads.forEach(h => drawArrowHead(ctx, h.tipX, h.tipY, h.angle, h.size, h.color));
+        labels.forEach(lb => drawScorePill(ctx, lb.x, lb.y, lb.text, lb.color));
+        } finally {
+            canvas.__drawing = false;
         }
     }
 
@@ -427,7 +584,8 @@
         if (counts) {
             const cw = hasCondorcet(counts, cands);
             const cycles = findCycles(counts, cands);
-            if (cw) html += `<span style="color:#6ee7b7;">برنده کندورسه: ${cw}</span>`;
+            if (cw) html += `<span class="legend-win">★ برنده کندورسه: ${cw}</span>`;
+            html += '<span class="legend-hint">پیکان از برنده به بازنده: A → B یعنی A می‌برد</span>';
             cycles.forEach((cyc, i) => {
                 const col = CYCLE_PALETTE[i % CYCLE_PALETTE.length];
                 html += `<span class="cycle-chip" style="color:${col};border-color:${col};">چرخه ${cyc.concat(cyc[0]).join(' → ')}</span>`;
@@ -438,64 +596,6 @@
 
     function formatRank(str) {
         return parseRanking(str).join(' ≻ ');
-    }
-
-    function stackRankHtml(rank) {
-        const parts = parseRanking(rank);
-        return parts.map((c, i) => {
-            const letter = `<span class="rank-letter" style="color:${candidateColor(c)}">${c}</span>`;
-            const arrow = i < parts.length - 1 ? '<span class="rank-lt">&lt;</span>' : '';
-            return letter + arrow;
-        }).join('');
-    }
-
-    function groupVoters(voters) {
-        const groups = [];
-        const at = {};
-        (voters || []).forEach((rank, i) => {
-            const key = parseRanking(rank).join('>');
-            if (at[key] === undefined) {
-                at[key] = groups.length;
-                groups.push({ rank: key, indices: [i], n: 1 });
-            } else {
-                groups[at[key]].indices.push(i);
-                groups[at[key]].n += 1;
-            }
-        });
-        return groups;
-    }
-
-    function tallyRanks(voters, cands) {
-        cands = cands || CANDIDATES;
-        const tally = {};
-        const keys = cands.length === 3 ? RANK3.slice() : [];
-        keys.forEach(k => { tally[k] = 0; });
-        (voters || []).forEach(rank => {
-            const key = parseRanking(rank).filter(c => cands.includes(c)).join('>');
-            if (!key) return;
-            if (tally[key] === undefined) tally[key] = 0;
-            tally[key] += 1;
-        });
-        const order = keys.length ? keys : Object.keys(tally);
-        return { tally, order };
-    }
-
-    function ballotChip(n, rank) {
-        return `<span class="ballot-chip"><span class="rank-arrow">${stackRankHtml(rank)}</span><b>${n}</b></span>`;
-    }
-
-    function renderRankTally(el, voters, cands) {
-        if (!el) return;
-        cands = cands || CANDIDATES;
-        const { tally, order } = tallyRanks(voters, cands);
-        const cols = order.map(key => {
-            const n = tally[key] || 0;
-            return `<div class="rank-col">
-                <div class="rank-arrow">${stackRankHtml(key)}</div>
-                <div class="rank-count">${n}</div>
-            </div>`;
-        }).join('');
-        el.innerHTML = `<div class="rank-tally">${cols}</div>`;
     }
 
     function RankingWidget(el, options) {
@@ -536,7 +636,7 @@
                 <div class="rank-slot" draggable="true" data-idx="${i}" aria-label="رتبه ${i + 1}: نامزد ${c}">
                     <span class="grip" aria-hidden="true">⋮⋮</span>
                     <span class="rank-num">${i + 1}</span>
-                    <span class="cand-chip" style="background:${candidateColor(c)};">${c}</span>
+                    <span class="cand-chip chip-${c}" style="background:${candidateColor(c)};">${c}</span>
                     <span class="cand-label">نامزد ${c} — ${tag}</span>
                     <span class="move-btns">
                         <button type="button" data-act="up" data-idx="${i}" ${i === 0 ? 'disabled' : ''} aria-label="بالاتر بردن ${c}">▲</button>
@@ -591,7 +691,7 @@
                 <div id="${el.id}-rank" style="flex:1;"></div>
                 <div class="adder-controls">
                     <label>تعداد رأی با این ترتیب
-                        <input type="number" id="${el.id}-qty" min="1" max="${MAX_VOTERS}" value="1">
+                        <input type="number" id="${el.id}-qty" min="1" max="99" value="1">
                     </label>
                     <button class="primary" id="${el.id}-add" type="button">${addLabel}</button>
                     ${options.extraButtons || ''}
@@ -615,12 +715,62 @@
         if (!el) return;
         el.innerHTML = `
             <div class="cand-bar">
-                ${cands.map(c => `<span class="cand-pill" style="background:${candidateColor(c)};">${c}</span>`).join('')}
-                <button type="button" class="outline" data-act="add" ${cands.length >= 6 ? 'disabled' : ''}>+ نامزد</button>
+                ${cands.map(c => `<span class="cand-pill chip-${c}" style="background:${candidateColor(c)};">${c}</span>`).join('')}
+                <button type="button" class="outline" data-act="add" ${cands.length >= 10 ? 'disabled' : ''}>+ نامزد</button>
                 <button type="button" class="outline" data-act="remove" ${cands.length <= 3 ? 'disabled' : ''}>حذف آخرین</button>
             </div>`;
         el.querySelector('[data-act="add"]').addEventListener('click', () => handlers.onAdd && handlers.onAdd());
         el.querySelector('[data-act="remove"]').addEventListener('click', () => handlers.onRemove && handlers.onRemove());
+    }
+
+    function groupVoters(voters) {
+        const groups = [];
+        const indexByRank = Object.create(null);
+        (voters || []).forEach((rank, i) => {
+            const key = String(rank || '');
+            if (indexByRank[key] === undefined) {
+                indexByRank[key] = groups.length;
+                groups.push({ rank: key, n: 1, indices: [i] });
+            } else {
+                const g = groups[indexByRank[key]];
+                g.n += 1;
+                g.indices.push(i);
+            }
+        });
+        return groups;
+    }
+
+    function stackRankHtml(rank, n) {
+        const parts = parseRanking(rank);
+        const letters = parts.map(c =>
+            `<span class="ballot-letter ballot-${c}">${c}</span>`
+        ).join('<span class="ballot-sep">≻</span>');
+        const qty = n > 1 ? `<span class="ballot-qty">×${n}</span>` : '';
+        return `<span class="ballot-group">${letters}${qty}</span>`;
+    }
+
+    function renderComboTally(el, voters) {
+        if (!el) return;
+        if (!voters || !voters.length) {
+            el.innerHTML = '';
+            return;
+        }
+        const rows = groupVoters(voters).map(g => {
+            return `<div class="combo-row">
+                ${stackRankHtml(g.rank, 1)}
+                <strong class="combo-n">${g.n}</strong>
+            </div>`;
+        }).join('');
+        el.innerHTML = `<div class="combo-tally">${rows}</div>`;
+    }
+
+    function renderRankTally(el, voters) {
+        if (!el) return;
+        if (!voters || !voters.length) {
+            el.innerHTML = '';
+            return;
+        }
+        renderComboTally(el, voters);
     }
 
     function renderVoterList(container, voters, onRemove, extra) {
@@ -629,28 +779,39 @@
             container.innerHTML = `<div class="empty-state">هنوز رأی‌دهنده‌ای اضافه نشده است.</div>`;
             return;
         }
-        const groups = groupVoters(voters);
-        let html = '<div class="voter-stacks">';
-        groups.forEach((g, gi) => {
-            const marked = extra.markIndex != null && g.indices.indexOf(extra.markIndex) >= 0;
-            const idx = g.indices[g.indices.length - 1];
+        const groups = extra.unstack
+            ? voters.map((rank, i) => ({ rank, n: 1, indices: [i] }))
+            : groupVoters(voters);
+        let html = '';
+        groups.forEach(g => {
+            const first = g.indices[0];
+            const marked = extra.markIndex != null && g.indices.indexOf(extra.markIndex) !== -1;
+            const mark = marked ? ' style="border-color:#f9b44a;background:rgba(249,180,74,.12);"' : '';
+            const rankLabel = extra.unstack
+                ? `#${first + 1} &nbsp; ${formatRank(g.rank)}`
+                : stackRankHtml(g.rank, g.n);
             html += `
-                <div class="voter-stack${marked ? ' marked' : ''}">
-                    <div class="rank-arrow">${stackRankHtml(g.rank)}</div>
-                    <div class="rank-count">${g.n}</div>
-                    ${marked ? '<div class="highlight-up">دیکتاتور</div>' : ''}
-                    <span class="stack-actions">
-                        ${extra.onEdit ? `<button type="button" class="outline edit-btn" data-idx="${g.indices[0]}">ویرایش</button>` : ''}
-                        ${extra.onPick ? `<button type="button" class="outline pick-btn" data-idx="${g.indices[0]}">انتخاب</button>` : ''}
-                        <button class="remove-btn" data-idx="${idx}" type="button">✕</button>
+                <div class="voter-item"${mark}>
+                    <span class="rank">${rankLabel}${marked ? ' <span class="highlight-up">دیکتاتور</span>' : ''}</span>
+                    <span style="display:flex;gap:4px;">
+                        ${extra.onEdit ? `<button type="button" class="outline edit-btn" data-idx="${first}">ویرایش</button>` : ''}
+                        ${extra.onPick ? `<button type="button" class="outline pick-btn" data-idx="${first}">انتخاب</button>` : ''}
+                        ${onRemove ? `<button class="remove-btn" data-idx="${first}" data-indices="${g.indices.join(',')}" type="button">✕</button>` : ''}
                     </span>
                 </div>`;
         });
-        html += '</div>';
         container.innerHTML = html;
-        container.querySelectorAll('.remove-btn').forEach(btn => {
-            btn.addEventListener('click', () => onRemove(parseInt(btn.dataset.idx, 10)));
-        });
+        if (onRemove) {
+            container.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const indices = String(btn.dataset.indices || btn.dataset.idx)
+                        .split(',')
+                        .map(n => parseInt(n, 10))
+                        .filter(n => !isNaN(n));
+                    onRemove(parseInt(btn.dataset.idx, 10), { indices });
+                });
+            });
+        }
         if (extra.onPick) {
             container.querySelectorAll('.pick-btn').forEach(btn => {
                 btn.addEventListener('click', () => extra.onPick(parseInt(btn.dataset.idx, 10)));
@@ -723,12 +884,22 @@
     function renderScoreBars(el, scores, cands) {
         cands = cands || Object.keys(scores || {});
         const max = Math.max(1, ...cands.map(c => scores[c] || 0));
+        const total = cands.reduce((s, c) => s + (scores[c] || 0), 0) || 1;
         el.innerHTML = cands.map(c => {
             const n = scores[c] || 0;
-            return `<div class="score-bar"><span class="candidate" style="color:${candidateColor(c)};width:24px;">${c}</span>
-                <div class="bar"><span style="width:${(n / max) * 100}%;background:${candidateColor(c)};"></span></div>
-                <strong>${n}</strong></div>`;
+            const pct = Math.round((n / total) * 100);
+            return `<div class="score-bar">
+                <span class="score-pill" style="background:${candidateColor(c)};">${c}</span>
+                <div class="bar"><span data-w="${(n / max) * 100}" style="width:0;background:${candidateColor(c)};"></span></div>
+                <strong>${n}</strong>
+                <span class="score-pct">${pct}٪</span>
+            </div>`;
         }).join('');
+        requestAnimationFrame(() => {
+            el.querySelectorAll('.bar > span[data-w]').forEach(span => {
+                span.style.width = span.getAttribute('data-w') + '%';
+            });
+        });
     }
 
     function pairTallyHtml(counts, cands) {
@@ -739,9 +910,9 @@
                 const a = cands[i], b = cands[j];
                 const r = getResult(counts, a, b);
                 const label = r.winner
-                    ? `<span class="winner">${r.winner}</span> (${r.ca} در برابر ${r.cb})`
-                    : `مساوی (${r.ca} در برابر ${r.cb})`;
-                html += `<div class="pair">${a} در برابر ${b}: ${label}</div>`;
+                    ? `<span class="winner">${r.winner}</span> <span class="pair-score">${r.ca}–${r.cb}</span>`
+                    : `مساوی <span class="pair-score">${r.ca}–${r.cb}</span>`;
+                html += `<div class="pair"><span class="pair-names" style="color:${candidateColor(a)}">${a}</span> در برابر <span class="pair-names" style="color:${candidateColor(b)}">${b}</span>: ${label}</div>`;
             }
         }
         return html;
@@ -774,12 +945,11 @@
                 addLabel: st.editing >= 0 ? 'جایگزین کردن این رأی' : 'افزودن رأی',
                 onAdd(rank, n) {
                     if (st.editing >= 0) {
-                        st.voters[st.editing] = rank;
+                        const old = st.voters[st.editing];
+                        st.voters = st.voters.map(r => r === old ? rank : r);
                         st.editing = -1;
                     } else {
-                        const room = MAX_VOTERS - st.voters.length;
-                        const add = Math.min(Math.max(1, n), Math.max(0, room));
-                        for (let i = 0; i < add; i++) st.voters.push(rank);
+                        for (let i = 0; i < n; i++) st.voters.push(rank);
                     }
                     render();
                 }
@@ -796,13 +966,11 @@
             if (opts.candidateBarId) {
                 renderCandidateBar(document.getElementById(opts.candidateBarId), st.candidates, {
                     onAdd() {
-                        if (opts.keepParadox && st.candidates.length >= MAX_VOTERS) return;
                         const nxt = nextCandidate(st.candidates);
                         if (!nxt) return;
                         st.candidates.push(nxt);
                         if (opts.keepParadox) st.voters = cyclicVoters(st.candidates);
                         else st.voters = appendCandidateToVoters(st.voters, nxt);
-                        if (st.voters.length > MAX_VOTERS) st.voters = st.voters.slice(0, MAX_VOTERS);
                         if (opts.stepwise) st.stepIndex = st.voters.length;
                         remount();
                         render();
@@ -821,13 +989,15 @@
             const shown = opts.stepwise ? st.voters.slice(0, st.stepIndex || st.voters.length) : st.voters;
             if (opts.voterCountId) document.getElementById(opts.voterCountId).textContent = st.voters.length;
             if (opts.voterListId) {
-                renderVoterList(document.getElementById(opts.voterListId), st.voters, i => {
-                    st.voters.splice(i, 1);
-                    if (st.editing === i) st.editing = -1;
+                renderVoterList(document.getElementById(opts.voterListId), st.voters, (i, info) => {
+                    const idxs = ((info && info.indices) || [i]).slice().sort((a, b) => b - a);
+                    idxs.forEach(j => st.voters.splice(j, 1));
+                    if (st.editing >= 0 && idxs.indexOf(st.editing) !== -1) st.editing = -1;
                     if (opts.stepwise && st.stepIndex > st.voters.length) st.stepIndex = st.voters.length;
                     remount();
                     render();
                 }, {
+                    unstack: !!opts.unstackVoters,
                     onEdit(i) {
                         st.editing = i;
                         remount();
@@ -835,6 +1005,7 @@
                     }
                 });
             }
+            if (opts.comboTallyId) renderComboTally(document.getElementById(opts.comboTallyId), st.voters);
             if (opts.stepwise) {
                 const total = st.voters.length;
                 if (opts.stepStatusId) document.getElementById(opts.stepStatusId).textContent = `${st.stepIndex} / ${total}`;
@@ -898,7 +1069,7 @@
             remount,
             countsNow,
             setVoters(v, process) {
-                st.voters = (v || []).slice(0, MAX_VOTERS);
+                st.voters = v.slice();
                 st.stepIndex = process || !opts.stepwise ? st.voters.length : 0;
                 st.editing = -1;
                 remount();
@@ -920,70 +1091,6 @@
         { key: 'IIA', name: 'IIA', title: 'استقلال از گزینه‌های نامرتبط' }
     ];
 
-    const API_BASES = ['http://127.0.0.1:8765', 'http://localhost:8765'];
-    const FETCH_FAIL = 'اتصال به API برقرار نشد. برای اجرای محلی python llm.py را اجرا کنید. روی Vercel متغیر ORCAROUTER_API_KEY را در تنظیمات پروژه بگذارید.';
-
-    function apiBases() {
-        const bases = [];
-        if (location.protocol === 'http:' || location.protocol === 'https:') {
-            bases.push('');
-        }
-        API_BASES.forEach(b => { if (!bases.includes(b)) bases.push(b); });
-        return bases;
-    }
-
-    async function postApi(path, payload) {
-        let lastErr = FETCH_FAIL;
-        for (const base of apiBases()) {
-            try {
-                const res = await fetch(base + path, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(localStorage.getItem('workshop-token')
-                            ? { Authorization: 'Bearer ' + localStorage.getItem('workshop-token') }
-                            : {})
-                    },
-                    body: JSON.stringify(payload)
-                });
-                let data = {};
-                try { data = await res.json(); } catch (e) { data = {}; }
-                if (!res.ok) {
-                    if (data && data.error) throw new Error(data.error);
-                    lastErr = new Error('درخواست ناموفق بود. python llm.py را دوباره اجرا کنید یا استقرار Vercel را بررسی کنید.');
-                    continue;
-                }
-                return data;
-            } catch (err) {
-                const msg = String((err && err.message) || err || '');
-                const network = err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(msg);
-                if (!network) throw err;
-                lastErr = err;
-            }
-        }
-        throw new Error(FETCH_FAIL);
-    }
-
-    async function evaluateSystem(prompt) {
-        const data = await postApi('/api/evaluate', { prompt });
-        return { criteria: data.criteria };
-    }
-
-    async function fetchExamples(prompt, criteria) {
-        const data = await postApi('/api/examples', { prompt, criteria });
-        return data.examples || [];
-    }
-
-    async function checkBackend() {
-        for (const base of apiBases()) {
-            try {
-                const res = await fetch(base + '/api/health', { method: 'GET' });
-                if (res.ok) return true;
-            } catch (e) { /* try next */ }
-        }
-        return false;
-    }
-
     function escapeHtml(s) {
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;')
@@ -992,11 +1099,21 @@
             .replace(/"/g, '&quot;');
     }
 
-    function loadIdeas() {
-        try { return JSON.parse(localStorage.getItem(IDEA_KEY) || '[]'); } catch (e) { return []; }
+    function isStaffUser(user) {
+        return user && (user.role === 'admin' || user.role === 'owner');
     }
-    function saveIdeas(ideas) {
-        localStorage.setItem(IDEA_KEY, JSON.stringify(ideas));
+
+    function maskedName(name, revealed, isOwn) {
+        if (isOwn || revealed) return escapeHtml(name || '');
+        return '<span class="masked-name">●●●●</span>';
+    }
+
+    function ballotChip(n, rank) {
+        const parts = parseRanking(rank);
+        const letters = parts.map(c =>
+            `<span class="ballot-letter ballot-${c}">${c}</span>`
+        ).join('<span class="ballot-sep">≻</span>');
+        return `<span class="ballot-group"><span class="ballot-qty">${n}×</span>${letters}</span>`;
     }
 
     function renderCriteriaChart(el, criteria, opts) {
@@ -1019,7 +1136,10 @@
                 <div class="chart-title" style="margin:16px 0 8px;">مثال‌هایی که این روش را رد می‌کنند</div>
                 ${examples.map((ex, i) => {
                     const meta = byRule[ex.rule] || { name: ex.rule, title: '' };
-                    const ballots = (ex.ballots || []).map(b => `<li>${b}</li>`).join('');
+                    const ballots = (ex.ballots || []).map(b => {
+                        const html = String(b);
+                        return `<li>${html.includes('<') ? html : escapeHtml(html)}</li>`;
+                    }).join('');
                     return `<div class="violation-demo counterexample-card">
                         <div class="title">${i + 1}. ${escapeHtml(meta.name)} — ${escapeHtml(ex.title || meta.title)}</div>
                         ${ballots ? `<ul class="plain">${ballots}</ul>` : ''}
@@ -1058,15 +1178,15 @@
     }
 
     global.Mentor = {
-        CANDIDATES, MAX_VOTERS, RANK3, COLORS, CRITERIA, IDEA_KEY, CYCLE_PALETTE,
+        CANDIDATES, COLORS, CRITERIA, CYCLE_PALETTE,
         candidateColor, nextCandidate, parseRanking, pairKey, buildCounts, getResult, getWins,
         rankingByWins, hasCondorcet, hasCycle, findCycles,
         plurality, borda, hare, sequential, dictator, condorcetMethod,
         firstChoices, unanimityHold, expandGroups, cyclicVoters, condorcetWinnerVoters,
-        drawGraph, legendHtml, formatRank, stackRankHtml, groupVoters, tallyRanks, renderRankTally, ballotChip, layoutPositions,
+        drawGraph, legendHtml, formatRank, layoutPositions,
         RankingWidget, mountVoterAdder, renderVoterList, renderMatrix, renderMatrixTable,
         renderWinRanking, renderScoreBars, renderCandidateBar, pairTallyHtml, createLab,
-        evaluateSystem, fetchExamples, renderCriteriaChart, checkBackend,
-        loadIdeas, saveIdeas, escapeHtml
+        renderCriteriaChart, escapeHtml, isStaffUser, maskedName, ballotChip,
+        groupVoters, stackRankHtml, renderRankTally, renderComboTally
     };
 })(window);
