@@ -9,6 +9,7 @@ import threading
 import time
 from copy import deepcopy
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -48,6 +49,7 @@ PBKDF2_ROUNDS = 120_000
 CRITERIA_KEYS = ["AAW", "CWC", "UNAN", "MONO", "IIA"]
 POINTS_PER_CRITERION = 10
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{2,32}$")
+SKYROOM_URL_MAX = 500
 
 _thread_lock = threading.Lock()
 
@@ -248,6 +250,7 @@ def _blank() -> dict:
                 "used_state1": False,
                 "sponsor": "",
                 "unlocked": ["vote"],
+                "skyroom_url": "",
             }
         },
         "sessions": {},
@@ -277,6 +280,7 @@ def _normalize(data: dict) -> dict:
         data["users"]["admin"] = _blank()["users"]["admin"]
     for user in data["users"].values():
         user.setdefault("sponsor", "")
+        user.setdefault("skyroom_url", "")
         user.setdefault(
             "unlocked",
             list(PANEL_IDS) if user.get("role") == "owner" else ["vote"],
@@ -400,7 +404,32 @@ def _public_user(user: dict) -> dict:
         "points": int(user.get("points") or 0),
         "used_state5": bool(user.get("used_state5")),
         "used_state1": bool(user.get("used_state1")),
+        "skyroom_url": user.get("skyroom_url") or "",
     }
+
+
+def _normalize_skyroom_url(raw: str) -> str:
+    raw = (raw or "").strip()
+    if not raw:
+        return ""
+    if len(raw) > SKYROOM_URL_MAX:
+        raise ValueError("لینک اسکایروم خیلی بلند است.")
+    if "://" not in raw:
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("لینک اسکایروم باید یک آدرس http یا https باشد.")
+    return raw
+
+
+def _resolved_skyroom_url(data: dict, user: dict) -> str:
+    if not user:
+        return ""
+    holder = user
+    if user.get("role") == "student":
+        sponsor = (user.get("sponsor") or "").strip()
+        holder = (data.get("users") or {}).get(sponsor) or {}
+    return (holder.get("skyroom_url") or "").strip()
 
 
 def token_from_headers(headers) -> str:
@@ -494,6 +523,7 @@ def create_student(actor: dict, username: str, password: str) -> dict:
             "used_state1": False,
             "sponsor": actor["username"],
             "unlocked": _audience_unlocked(data, actor),
+            "skyroom_url": "",
         }
         _bump(data)
         _dump(data)
@@ -527,6 +557,7 @@ def create_admin(actor: dict, username: str, password: str) -> dict:
             "used_state1": False,
             "sponsor": actor["username"],
             "unlocked": ["vote"],
+            "skyroom_url": "",
         }
         _bump(data)
         _dump(data)
@@ -574,6 +605,26 @@ def list_users(actor: dict) -> list:
                 users.append(_public_user(u))
         users.sort(key=lambda u: ({"owner": 0, "admin": 1}.get(u["role"], 2), u["username"]))
         return users
+
+
+def set_skyroom_url(actor: dict, url: str, username: str = "") -> str:
+    if not is_staff(actor):
+        raise PermissionError("فقط Mentor یا Admin می‌تواند لینک اسکایروم را عوض کند.")
+    url = _normalize_skyroom_url(url)
+    target = (username or "").strip() or actor["username"]
+    with _lock:
+        data = _load()
+        user = data["users"].get(target)
+        if not user:
+            raise ValueError("حساب پیدا نشد.")
+        if user.get("role") not in ("owner", "admin"):
+            raise ValueError("لینک اسکایروم برای Mentor یا Admin تنظیم می‌شود.")
+        if is_admin(actor) and target != actor["username"]:
+            raise PermissionError("فقط لینک کلاس خودتان را می‌توانید عوض کنید.")
+        user["skyroom_url"] = url
+        _bump(data)
+        _dump(data)
+        return url
 
 
 def _related_ids(panel_id: str, hiding: bool = False) -> list:
@@ -1182,6 +1233,7 @@ def pull_from_lobby(actor: dict, lobby_id: str) -> dict:
             "used_state1": False,
             "sponsor": actor["username"],
             "unlocked": _audience_unlocked(data, actor),
+            "skyroom_url": "",
         }
         # Remove from lobby but remember session for waiting client
         lobby_token = entry.get("token") or ""
@@ -1262,9 +1314,11 @@ def snapshot(user: dict) -> dict:
             votes = list(data.get("vote_display") or [])
         unlocked = _audience_unlocked(data, stored)
         lobby = list(data.get("lobby") or []) if is_staff(stored) else []
+        me = _public_user(stored)
+        me["skyroom_url"] = _resolved_skyroom_url(data, stored)
         return {
             "version": data.get("version") or 0,
-            "me": _public_user(stored),
+            "me": me,
             "unlocked": unlocked,
             "vote_revealed": bool(data.get("vote_revealed")),
             "my_vote": (data.get("votes") or {}).get(user["username"]),

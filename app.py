@@ -175,6 +175,19 @@ async def admin_create_admin(request: Request):
         return fail(exc)
 
 
+@app.post("/api/admin/skyroom")
+async def admin_set_skyroom(request: Request):
+    user, err = require_user(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+        url = workshop.set_skyroom_url(user, body.get("url") or "", body.get("username") or "")
+        return {"ok": True, "skyroom_url": url}
+    except CATCH as exc:
+        return fail(exc)
+
+
 @app.post("/api/state1")
 async def state1_idea(request: Request):
     user, err = require_user(request)
