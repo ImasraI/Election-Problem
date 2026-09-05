@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۶.۴ – حذف تدریجی</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 6.4 · HARE</div>
+        <h2 class="cond-title">روش حذف تدریجی (هر)</h2>
+        <div class="explain-panel">
+            <p>در هر دور فقط رأی اول شمرده می‌شود؛ کم‌رأی‌ترین حذف می‌شود و رأی‌هایش به انتخاب بعدی منتقل می‌گردد.</p>
+            <p>این کار تا ماندن یک نامزد ادامه دارد. همیشه برنده دارد.</p>
+            <p>ممکن است بالا بردن یک نامزد مسیر حذف را عوض کند و همان نامزد ببازد؛ یکنوایی نقض می‌شود.</p>
+        </div>
+        <div id="chart"></div>
+        <div class="card">
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="cwcBtn" type="button">نقض کندورسه</button>
+                <button class="outline" id="beforeBtn" type="button">یکنوایی — قبل</button>
+                <button class="outline" id="afterBtn" type="button">یکنوایی — بعد</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                </div>
+                <div>
+                    <div id="out"></div>
+                    <div id="rounds"></div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="460" height="460"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                    <div id="bars"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const cwcEx = M.expandGroups([
+            { n: 2, rank: 'A>B>C' },
+            { n: 1, rank: 'B>C>A' },
+            { n: 2, rank: 'C>B>A' }
+        ]);
+        const before = M.expandGroups([
+            { n: 2, rank: 'A>B>C' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
+        ]);
+        const after = M.expandGroups([
+            { n: 3, rank: 'A>B>C' },
+            { n: 1, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
+        ]);
+        M.renderCriteriaChart(document.getElementById('chart'), {
+            AAW: true, CWC: false, UNAN: true, MONO: false, IIA: false
+        }, {
+            title: 'نمودار ازپیش‌آماده‌شده',
+            examples: [
+                {
+                    rule: 'CWC',
+                    title: 'B همه را دونفره می‌برد؛ هر، C را برنده می‌کند',
+                    ballots: [M.ballotChip(2, 'A>B>C') + M.ballotChip(1, 'B>C>A') + M.ballotChip(2, 'C>B>A')],
+                    result: 'مقایسه دونفره بدون دور: B از A می‌برد ۳–۲ و B از C می‌برد ۳–۲، پس برنده کندورسه B است. در هر فقط رأی اول شمرده می‌شود: A=۲، B=۱، C=۲. B کم‌رأی‌ترین است و حذف می‌شود. بعد C با ۳ در برابر ۲ از A می‌برد.',
+                    why: 'هر برندهٔ مقایسه‌های دونفره را کنار می‌گذارد چون اولِ کمی دارد؛ برندهٔ هر (C) با برندهٔ کندورسه (B) یکی نیست.'
+                },
+                {
+                    rule: 'MONO',
+                    title: 'یک رأی از B به A مسیر حذف را عوض می‌کند',
+                    ballots: [M.ballotChip(2, 'A>B>C') + M.ballotChip(2, 'B>C>A') + M.ballotChip(2, 'C>A>B'), M.ballotChip(3, 'A>B>C') + M.ballotChip(1, 'B>C>A') + M.ballotChip(2, 'C>A>B')],
+                    result: 'قبل با تساوی سه‌طرفه A حذف می‌شود و B می‌ماند. بعد B حذف می‌شود و C می‌ماند.',
+                    why: 'تغییر به نفع A، برنده را از B به C برد؛ یکنوایی نقض می‌شود.'
+                }
+            ]
+        });
+        function roundsHtml(hr) {
+            return (hr.rounds || []).map(r => {
+                const votes = (r.active || []).map(c =>
+                    `<span class="cand-vote">${c}: <span class="count">${r.counts[c] || 0}</span></span>`
+                ).join('');
+                const tail = r.eliminatedThis
+                    ? `<div class="eliminated">حذف کم‌رأی‌ترین: ${r.eliminatedThis}</div>`
+                    : (r.winner ? `<div class="winner">یک نفر ماند → برنده: ${r.winner}</div>` : '');
+                return `<div class="round-display">
+                    <div class="round-title">دور ${r.round} — باقی‌مانده: ${(r.active || []).join('، ')}</div>
+                    <div class="votes">${votes}</div>
+                    ${tail}
+                </div>`;
+            }).join('');
+        }
+        const lab = M.createLab({
+            candidates: THREE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const hr = M.hare(lab.state.voters, cands);
+                const pl = M.plurality(lab.state.voters, cands);
+                const cw = counts ? M.hasCondorcet(counts, cands) : null;
+                const cyc = counts ? M.hasCycle(counts, cands) : false;
+                if (pl.counts) M.renderScoreBars(document.getElementById('bars'), pl.counts, cands);
+                M.drawGraph(document.getElementById('graphCanvas'), counts, {
+                    candidates: cands,
+                    highlightWinner: cw || hr.winner
+                });
+                const el = document.getElementById('out');
+                const roundsEl = document.getElementById('rounds');
+                if (!lab.state.voters.length) {
+                    el.innerHTML = '';
+                    roundsEl.innerHTML = '';
+                    return;
+                }
+                const mismatch = cw && hr.winner && cw !== hr.winner;
+                const cwLabel = cw || (cyc ? 'نیست (دور)' : '—');
+                el.innerHTML = `
+                    <div class="result-box ${mismatch ? 'loss' : 'info'}">برنده هر: ${hr.winner || '—'} · برنده کندورسه: ${cwLabel}</div>
+                    ${mismatch ? `<p class="text-muted" style="margin-top:8px;">هر ${hr.winner} را برنده کرد، در حالی که ${cw} همه را دونفره می‌برد.</p>` : ''}
+                    <div class="pairwise-contrib" style="margin-top:8px;">${M.pairTallyHtml(counts, cands)}</div>`;
+                roundsEl.innerHTML = roundsHtml(hr);
+            }
+        });
+        document.getElementById('cwcBtn').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(cwcEx, true); });
+        document.getElementById('beforeBtn').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(before, true); });
+        document.getElementById('afterBtn').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(after, true); });
+        lab.setVoters(cwcEx, true);
+    </script>
+</body>
+</html>

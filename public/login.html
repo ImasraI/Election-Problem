@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa" data-public-page="1">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ورود به کارگاه</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+        body { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; }
+        @media (max-width: 720px) {
+            body { padding-left: 80px; }
+        }
+        .app-logo {
+            position: fixed;
+            top: 20px;
+            right: 24px;
+            height: 88px;
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 6px 16px rgba(249, 180, 74, .22));
+        }
+        .login-card { width: min(440px, 100%); }
+        .login-card h1 { font-size: 24px; margin-bottom: 8px; }
+        .login-card p { color: var(--c-muted); margin-bottom: 18px; line-height: 1.7; }
+        .login-card label { display: block; font-size: 13px; font-weight: 700; margin: 12px 0 6px; }
+        .login-card input { width: 100%; padding: 10px 12px; }
+        .login-card button { width: 100%; justify-content: center; margin-top: 18px; padding: 12px; }
+        .err { color: var(--c-rose); min-height: 1.4em; margin-top: 10px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <img class="corner-logo" src="logo2.png" alt="" width="76" height="76">
+    <div class="card login-card">
+        <h1>ورود به کارگاه</h1>
+        <p>حساب را Admin یا Mentor می‌سازد. Voterها می‌توانند از <a href="index.html">لابی</a> با نام و گروه وارد شوند، یا اینجا با حساب وارد شوند.</p>
+        <form id="loginForm">
+            <label>نام کاربری</label>
+            <input id="username" autocomplete="username" required>
+            <label>رمز عبور</label>
+            <input id="password" type="password" autocomplete="current-password" required>
+            <label>نام Voter</label>
+            <input id="name" autocomplete="name" placeholder="برای Admin و Mentor اختیاری">
+            <label>نام تیم</label>
+            <input id="team" placeholder="برای Admin و Mentor اختیاری">
+            <div class="err" id="err"></div>
+            <div class="err" id="storeWarn"></div>
+            <button class="primary" type="submit">ورود</button>
+        </form>
+    </div>
+    <script src="workshop.js"></script>
+    <script>
+        if (Workshop.token()) location.href = 'workshop.html';
+        fetch('/api/health').then(r => r.json()).then(h => {
+            if (h && h.live === false) {
+                document.getElementById('storeWarn').textContent =
+                    'این استقرار Redis ندارد؛ کارگاه زنده بین Voterها همگام نمی‌شود. در Vercel یک Redis (Upstash) بسازید و به پروژه وصل کنید.';
+            }
+        }).catch(() => {});
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const err = document.getElementById('err');
+            err.textContent = '';
+            try {
+                await Workshop.login(
+                    document.getElementById('username').value,
+                    document.getElementById('password').value,
+                    document.getElementById('name').value,
+                    document.getElementById('team').value
+                );
+                location.href = 'workshop.html';
+            } catch (ex) {
+                err.textContent = ex.message || String(ex);
+            }
+        });
+    </script>
+</body>
+</html>

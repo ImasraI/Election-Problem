@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۶.۵ – زوجی ترتیبی</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 6.5 · SEQUENTIAL</div>
+        <h2 class="cond-title">مقایسه زوجی با دستورکار ثابت</h2>
+        <div class="explain-panel">
+            <p>از قبل یک دستورکار (Agenda) ثابت می‌شود: مثلاً اول A با B، برنده با C.</p>
+            <p>همیشه برنده دارد و اگر برندهٔ کندورسه باشد او تا آخر می‌ماند.</p>
+            <p>عوض کردن فقط ترتیب مبارزه — بدون عوض شدن هیچ رأیی — می‌تواند برنده را عوض کند؛ پس IIA نقض می‌شود.</p>
+        </div>
+        <div id="chart"></div>
+        <div class="card">
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">بارگذاری مثال</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="row" style="margin-top:12px;align-items:flex-start;">
+                <span class="text-muted">دستورکار:</span>
+                <div id="agendaRank" style="min-width:260px;flex:1;"></div>
+            </div>
+            <div id="agendaOut" style="margin-top:12px;"></div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                </div>
+                <div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="460" height="460"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const EXAMPLE = M.expandGroups([
+            { n: 2, rank: 'A>B>C' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>A>B' }
+        ]);
+        M.renderCriteriaChart(document.getElementById('chart'), {
+            AAW: true, CWC: true, UNAN: true, MONO: true, IIA: false
+        }, {
+            title: 'نمودار ازپیش‌آماده‌شده',
+            examples: [
+                {
+                    rule: 'IIA',
+                    title: 'دو دستورکار، یک مجموعه رأی کامل',
+                    ballots: [M.ballotChip(2, 'A>B>C'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>A>B')],
+                    result: 'دستورکار A، B، C برنده دیگری می‌دهد نسبت به C، B، A. هیچ ترجیحی عوض نشده.',
+                    why: 'ترتیب مبارزه یک گزینهٔ نامرتبط است و نتیجه را عوض می‌کند.'
+                }
+            ]
+        });
+        let agendaW = new M.RankingWidget('agendaRank', { candidates: THREE, order: THREE, onChange() { if (lab) lab.render(); } });
+        function stepsHtml(steps, winner) {
+            return steps.map(s => `<span class="step">${s.a} در برابر ${s.b} → <span class="winner">${s.winner || '—'}</span></span><span class="arrow">→</span>`).join('')
+                + `<span class="step" style="background:rgba(110,231,183,.16);border:2px solid #6ee7b7;">برنده: ${winner}</span>`;
+        }
+        const lab = M.createLab({
+            candidates: THREE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                if (agendaW.candidates.join() !== cands.join()) {
+                    agendaW.setCandidates(cands, cands);
+                }
+                if (!lab.state.voters.length) {
+                    document.getElementById('agendaOut').innerHTML = '';
+                    return;
+                }
+                const agenda = agendaW.getOrder();
+                const r = M.sequential(lab.state.voters, agenda, cands);
+                document.getElementById('agendaOut').innerHTML =
+                    `<div class="result-box info">برنده با دستورکار ${agenda.join('، ')}: ${r.winner}</div>
+                     <div class="agenda-display">${stepsHtml(r.steps, r.winner)}</div>`;
+                M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: r.winner });
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => {
+            lab.setCandidates(THREE);
+            lab.setVoters(EXAMPLE, true);
+        });
+        lab.setVoters(EXAMPLE, true);
+    </script>
+</body>
+</html>

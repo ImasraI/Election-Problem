@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>رأی‌گیری</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">VOTING</div>
+        <h2 class="cond-title">رأی‌گیری</h2>
+        <div class="card">
+            <p class="text-muted">سه نامزد A، B و C را به ترتیب ترجیح خود بچینید. تا قبل از نمایش نتیجه می‌توانید رأی را عوض کنید.</p>
+            <div id="rankBox" style="margin-top:12px;"></div>
+            <div class="row" style="margin-top:12px;">
+                <button class="primary" id="submitBtn" type="button">ثبت رأی</button>
+                <button class="success hidden" id="presentBtn" type="button">Present / نمایش نتایج</button>
+            </div>
+            <div id="status" class="text-muted" style="margin-top:10px;"></div>
+        </div>
+        <div class="card hidden" id="resultsCard">
+            <div class="card-header"><span>نتیجه رأی‌گیری کلاس</span><span class="badge" id="voteCount">۰ رأی</span></div>
+            <div id="scoreBars"></div>
+            <div id="tally" style="margin-top:16px;"></div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const widget = new M.RankingWidget('rankBox', { candidates: ['A', 'B', 'C'] });
+        const statusEl = document.getElementById('status');
+        const submitBtn = document.getElementById('submitBtn');
+        const presentBtn = document.getElementById('presentBtn');
+        const resultsCard = document.getElementById('resultsCard');
+        let me = null;
+        let revealed = false;
+        let appliedMine = false;
+
+        function expandFixed(groups) {
+            const votes = [];
+            groups.forEach(g => {
+                for (let i = 0; i < g.n; i++) votes.push({ name: g.name, team: g.team, rank: g.rank });
+            });
+            return votes;
+        }
+        const FIXED_RESULT = {
+            votes: expandFixed([
+                { n: 24, name: 'User1', team: '1', rank: 'A>B>C' },
+                { n: 3, name: 'User1', team: '2', rank: 'A>B>C' },
+                { n: 7, name: 'User3', team: '1', rank: 'A>C>B' },
+                { n: 6, name: 'User3', team: '2', rank: 'B>A>C' },
+                { n: 22, name: 'Arsam', team: '2', rank: 'B>C>A' },
+                { n: 16, name: 'Sina', team: '2', rank: 'C>A>B' },
+                { n: 12, name: 'User4', team: '2', rank: 'C>B>A' }
+            ])
+        };
+
+        function hideResults() {
+            resultsCard.classList.add('hidden');
+            document.getElementById('scoreBars').innerHTML = '';
+            document.getElementById('tally').innerHTML = '';
+            document.getElementById('voteCount').textContent = '۰ رأی';
+        }
+
+        function isStaff(user) { return user && (user.role === 'owner' || user.role === 'admin'); }
+
+        function applyVote(vote) {
+            if (!vote || !vote.rank) return;
+            widget.setOrder(M.parseRanking(vote.rank));
+        }
+
+        const ALL_RANKS = ['A>B>C', 'A>C>B', 'B>A>C', 'B>C>A', 'C>A>B', 'C>B>A'];
+
+        function resultVotes(votes) {
+            if (FIXED_RESULT && Array.isArray(FIXED_RESULT.votes) && FIXED_RESULT.votes.length) {
+                return FIXED_RESULT.votes;
+            }
+            return votes || [];
+        }
+
+        function showResults(votes) {
+            const shown = resultVotes(votes);
+            resultsCard.classList.remove('hidden');
+            document.getElementById('voteCount').textContent = shown.length + ' رأی';
+            const ranks = shown.map(v => M.parseRanking(v.rank).join('>'));
+            const cands = ['A', 'B', 'C'];
+            const plur = M.plurality(ranks, cands);
+            M.renderScoreBars(document.getElementById('scoreBars'), plur.counts, cands);
+            const counts = ranks.length ? M.buildCounts(ranks, cands) : null;
+            const borda = M.borda(ranks, cands);
+            const tally = {};
+            ALL_RANKS.forEach(key => { tally[key] = 0; });
+            ranks.forEach(key => {
+                if (tally[key] === undefined) tally[key] = 0;
+                tally[key] += 1;
+            });
+            const cols = ALL_RANKS.map(key => {
+                const n = tally[key] || 0;
+                const parts = M.parseRanking(key);
+                const stack = parts.map((c, i) => {
+                    const letter = `<span class="rank-letter-chip ${c}">${c}</span>`;
+                    const arrow = i < parts.length - 1 ? '<span class="rank-lt">&lt;</span>' : '';
+                    return letter + arrow;
+                }).join('');
+                return `<div class="rank-col">
+                    <div class="rank-arrow">${stack}</div>
+                    <div class="rank-count">${n}</div>
+                    
+                </div>`;
+            }).join('');
+            document.getElementById('tally').innerHTML = `
+                <p>برنده اکثریت نسبی: <strong>${plur.winner || '—'}</strong></p>
+                <div class="rank-tally">${cols}</div>`;
+        }
+
+        submitBtn.addEventListener('click', async () => {
+            submitBtn.disabled = true;
+            try {
+                await Workshop.request('POST', '/api/vote', { rank: widget.getString() });
+                statusEl.textContent = 'رأی شما ثبت شد.';
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            }
+            submitBtn.disabled = revealed;
+        });
+
+        presentBtn.addEventListener('click', async () => {
+            presentBtn.disabled = true;
+            try {
+                const data = await Workshop.request('POST', '/api/vote/present', {});
+                revealed = true;
+                submitBtn.disabled = true;
+                showResults(data.votes || []);
+                statusEl.textContent = 'نتیجه برای همه نمایش داده شد.';
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+                presentBtn.disabled = false;
+            }
+        });
+
+        Workshop.startPolling((data, changed) => {
+            me = data.me;
+            presentBtn.classList.toggle('hidden', !isStaff(me));
+            if (data.my_vote && !appliedMine) {
+                applyVote(data.my_vote);
+                appliedMine = true;
+            }
+            const nowRevealed = !!data.vote_revealed;
+            if (nowRevealed) {
+                if (!revealed || changed) {
+                    revealed = true;
+                    submitBtn.disabled = true;
+                    showResults(data.votes || []);
+                }
+                return;
+            }
+            if (revealed || !resultsCard.classList.contains('hidden')) {
+                hideResults();
+            }
+            revealed = false;
+            submitBtn.disabled = false;
+            presentBtn.disabled = false;
+            if (!data.my_vote) appliedMine = false;
+        });
+    </script>
+</body>
+</html>

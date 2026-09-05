@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۶.۱ – کندورسه</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 6.1 · CONDORCET</div>
+        <h2 class="cond-title">روش کندورسه</h2>
+        <div class="explain-panel">
+            <p>هر دو نامزد با هم مقایسه می‌شوند؛ اگر کسی همه را دونفره ببرد، همان برنده است.</p>
+            <p>معیار کندورسه به‌طور طبیعی برقرار است، چون روش دقیقاً همان نامزد را پیدا می‌کند.</p>
+            <p>اگر دور کامل باشد، روش پاسخی نمی‌دهد و شرط «همیشه برنده» نقض می‌شود.</p>
+        </div>
+        <div id="chart"></div>
+        <div class="card">
+            <div class="card-header"><span>گراف</span></div>
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="winBtn" type="button">مثال با برنده</button>
+                <button class="outline" id="cycleBtn" type="button">مثال چرخه</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                    <div id="out"></div>
+                </div>
+                <div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="460" height="460"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                    <div style="overflow-x:auto;"><table class="matrix-table" id="matrixTable"></table></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        M.renderCriteriaChart(document.getElementById('chart'), {
+            AAW: false, CWC: true, UNAN: true, MONO: true, IIA: true
+        }, {
+            title: 'نمودار ازپیش‌آماده‌شده',
+            examples: [
+                {
+                    rule: 'AAW',
+                    title: 'چرخه کامل؛ روش ساکت می‌ماند',
+                    ballots: [M.ballotChip(2, 'A>B>C'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>A>B')],
+                    result: 'A بر B، B بر C، C بر A. هیچ‌کس همه را دونفره نمی‌برد.',
+                    why: 'بدون شکستن تساوی/چرخه پاسخی نیست؛ پس همیشه برنده نیست.'
+                }
+            ]
+        });
+        const lab = M.createLab({
+            candidates: THREE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            matrixId: 'matrixTable', graphId: 'graphCanvas', legendId: 'graphLegend',
+            highlightCondorcet: true,
+            onRender(counts) {
+                const res = M.condorcetMethod(lab.state.voters, lab.state.candidates);
+                const el = document.getElementById('out');
+                if (!lab.state.voters.length) el.innerHTML = '';
+                else if (res.winner) el.innerHTML = `<div class="result-box win">برنده کندورسه: ${res.winner}</div>`;
+                else el.innerHTML = `<div class="result-box loss">روش پاسخی نمی‌دهد.</div>`;
+            }
+        });
+        document.getElementById('winBtn').addEventListener('click', () => {
+            lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
+        });
+        document.getElementById('cycleBtn').addEventListener('click', () => {
+            lab.setVoters(M.cyclicVoters(THREE), true);
+        });
+        lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
+    </script>
+</body>
+</html>

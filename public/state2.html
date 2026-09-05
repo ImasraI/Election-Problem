@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۲ – وقتی برنده کندورسه هست</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 2</div>
+        <h2 class="cond-title">مقایسه دوبه‌دو و یک برنده مشخص</h2>
+        <div class="explain-panel">
+            <p>برندهٔ کندورسه کسی است که در مقایسهٔ دونفره با همهٔ رقبا پیروز شود.</p>
+            <p>وقتی دور وجود ندارد، این مقایسه‌ها یک ترتیب کامل از بهتر به بدتر می‌سازند.</p>
+            <p>اگر چنین نامزدی باشد، سیستم منطقی باید همان را اعلام کند.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span>نامزدها</span></div>
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">بارگذاری مثال با برنده</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه آرا</button>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                <div class="voter-list" id="voterList"></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><span>تحلیل گام‌به‌گام</span><span class="badge" id="stepStatus">۰ / ۰</span></div>
+                <div class="step-area"><div id="stepDetail"></div></div>
+                <div class="btn-group">
+                    <button class="success" id="stepBtn" type="button">گام بعدی</button>
+                    <button class="primary" id="processAllBtn" type="button">پردازش همه</button>
+                    <button class="outline" id="resetStepsBtn" type="button">بازنشانی گام‌ها</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header"><span>ماتریس مقایسه‌ها</span><span class="badge" id="condorcetBadge">در انتظار</span></div>
+                <div style="overflow-x:auto;"><table class="matrix-table" id="matrixTable"></table></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><span>گراف جهت‌دار</span><span class="badge" id="graphStatus">بدون داده</span></div>
+                <div class="graph-wrap"><canvas id="graphCanvas" width="520" height="520"></canvas></div>
+                <div class="graph-legend" id="graphLegend"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span>رتبه‌بندی بر اساس پیروزی‌های دوبه‌دو</span><span class="badge" id="rankStatus">در انتظار</span></div>
+            <div id="rankingContainer"></div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const lab = M.createLab({
+            candidates: THREE,
+            stepwise: true,
+            highlightCondorcet: true,
+            adderId: 'adder',
+            candidateBarId: 'candBar',
+            voterCountId: 'voterCount',
+            voterListId: 'voterList',
+            stepStatusId: 'stepStatus',
+            stepDetailId: 'stepDetail',
+            stepBtnId: 'stepBtn',
+            processAllBtnId: 'processAllBtn',
+            resetStepsBtnId: 'resetStepsBtn',
+            resetBtnId: 'resetBtn',
+            matrixId: 'matrixTable',
+            graphId: 'graphCanvas',
+            legendId: 'graphLegend',
+            rankingId: 'rankingContainer',
+            onRender(counts) {
+                const badge = document.getElementById('condorcetBadge');
+                const gStatus = document.getElementById('graphStatus');
+                const rStatus = document.getElementById('rankStatus');
+                if (!counts) {
+                    badge.textContent = gStatus.textContent = rStatus.textContent = 'در انتظار';
+                    badge.className = gStatus.className = rStatus.className = 'badge';
+                    return;
+                }
+                const cw = M.hasCondorcet(counts, lab.state.candidates);
+                const cyc = M.hasCycle(counts, lab.state.candidates);
+                if (cw) {
+                    badge.textContent = gStatus.textContent = rStatus.textContent = 'برنده کندورسه: ' + cw;
+                    badge.className = gStatus.className = rStatus.className = 'badge condorcet';
+                } else if (cyc) {
+                    badge.textContent = gStatus.textContent = 'چرخه — بدون برنده مطلق';
+                    rStatus.textContent = 'پارادوکس';
+                    badge.className = gStatus.className = rStatus.className = 'badge cycle';
+                } else {
+                    badge.textContent = 'بدون برنده مطلق';
+                    gStatus.textContent = 'گراف کامل';
+                    rStatus.textContent = 'رتبه‌بندی پیروزی‌ها';
+                    badge.className = gStatus.className = rStatus.className = 'badge';
+                }
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => {
+            lab.setCandidates(THREE);
+            lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
+        });
+        lab.setVoters(M.condorcetWinnerVoters(THREE, 'A'), true);
+    </script>
+</body>
+</html>

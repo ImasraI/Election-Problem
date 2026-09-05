@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۴.۵ – استقلال از گزینه‌های نامرتبط</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+        .graph-wrap { min-height: 280px; }
+        .graph-wrap canvas { min-height: 260px; background: rgba(6, 9, 19, .35); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 4.5 · IIA</div>
+        <h2 class="cond-title">استقلال از گزینه‌های نامرتبط</h2>
+        <div class="explain-panel">
+            <p>اگر a برنده و b بازنده باشد، جابه‌جایی نامزد سوم (مثل C) نباید نتیجهٔ a در برابر b را عوض کند.</p>
+            <p>مقایسهٔ دو نامزد فقط به نظر مردم دربارهٔ همان دو بستگی دارد، نه به حضور یا محبوبیت گزینهٔ نامرتبط.</p>
+            <p>این شرط Independence of Irrelevant Alternatives است.</p>
+        </div>
+
+        <div class="side-compare">
+            <div class="compare-col">
+                <h3>حالت اول</h3>
+                <div id="t1"></div>
+                <div class="graph-wrap"><canvas id="g1" width="420" height="420"></canvas></div>
+                <div class="graph-legend" id="l1"></div>
+                <div id="b1"></div>
+                <div class="result-box win" id="r1">برنده: —</div>
+            </div>
+            <div class="compare-col">
+                <h3>حالت دوم — فقط C جابه‌جا شده؛ A در برابر B ثابت است</h3>
+                <div id="t2"></div>
+                <div class="graph-wrap"><canvas id="g2" width="420" height="420"></canvas></div>
+                <div class="graph-legend" id="l2"></div>
+                <div id="b2"></div>
+                <div class="result-box loss" id="r2">برنده: —</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+            <div class="card-header"><span>آرا</span></div>
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="load1" type="button">بارگذاری حالت اول</button>
+                <button class="outline" id="load2" type="button">بارگذاری حالت دوم</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                </div>
+                <div>
+                    <div id="liveOut"></div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="420" height="420"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                    <div id="bars"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const profile1 = M.expandGroups([
+            { n: 3, rank: 'A>B>C' },
+            { n: 2, rank: 'B>A>C' },
+            { n: 1, rank: 'C>A>B' }
+        ]);
+        const profile2 = M.expandGroups([
+            { n: 1, rank: 'A>B>C' },
+            { n: 2, rank: 'B>A>C' },
+            { n: 3, rank: 'C>A>B' }
+        ]);
+
+        function paint(canvasId, legendId, barsId, tallyId, resultId, voters) {
+            const canvas = document.getElementById(canvasId);
+            const counts = M.buildCounts(voters, THREE);
+            const pl = M.plurality(voters, THREE);
+            M.drawGraph(canvas, counts, { candidates: THREE, highlightWinner: pl.winner });
+            document.getElementById(legendId).innerHTML = M.legendHtml(counts, { candidates: THREE });
+            M.renderScoreBars(document.getElementById(barsId), pl.counts, THREE);
+            if (M.renderComboTally) M.renderComboTally(document.getElementById(tallyId), voters);
+            document.getElementById(resultId).textContent = 'برنده: ' + (pl.winner || '—');
+        }
+        function paintBoth() {
+            paint('g1', 'l1', 'b1', 't1', 'r1', profile1);
+            paint('g2', 'l2', 'b2', 't2', 'r2', profile2);
+        }
+        paintBoth();
+        requestAnimationFrame(paintBoth);
+
+        const lab = M.createLab({
+            candidates: THREE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const pl = M.plurality(lab.state.voters, cands);
+                if (pl.counts) M.renderScoreBars(document.getElementById('bars'), pl.counts, cands);
+                const el = document.getElementById('liveOut');
+                if (!lab.state.voters.length) { el.innerHTML = ''; return; }
+                el.innerHTML = `<div class="result-box ${pl.winner === 'A' ? 'win' : (pl.winner === 'B' ? 'loss' : 'info')}">برنده رأیِ اول: ${pl.winner || '—'}</div>`;
+                M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: pl.winner });
+            }
+        });
+        document.getElementById('load1').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(profile1, true); });
+        document.getElementById('load2').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(profile2, true); });
+        lab.setVoters(profile1, true);
+    </script>
+</body>
+</html>

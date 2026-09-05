@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۶.۳ – بوردا</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 6.3 · BORDA</div>
+        <h2 class="cond-title">روش بوردا</h2>
+        <div class="explain-panel">
+            <p>هر نفر همهٔ نامزدها را رتبه‌بندی می‌کند؛ جایگاه اول n−۱ امتیاز می‌گیرد تا آخر که صفر است.</p>
+            <p>مجموع امتیاز همهٔ برگه‌ها برنده را مشخص می‌کند. برخلاف اکثریت، کل فهرست ترجیح به حساب می‌آید.</p>
+            <p>همیشه برنده دارد، اما ممکن است برندهٔ کندورسه امتیاز کمتری بگیرد و جابه‌جایی C امتیاز A و B را عوض کند.</p>
+        </div>
+        <div id="chart"></div>
+        <div class="card">
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">مثال نمونه</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+            <div class="grid-2" style="margin-top:12px;">
+                <div>
+                    <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                    <div class="voter-list" id="voterList"></div>
+                </div>
+                <div>
+                    <div id="bars"></div>
+                    <div id="out"></div>
+                    <div class="graph-wrap"><canvas id="graphCanvas" width="460" height="460"></canvas></div>
+                    <div class="graph-legend" id="graphLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const EXAMPLE = M.expandGroups([
+            { n: 2, rank: 'A>B>C' },
+            { n: 2, rank: 'B>C>A' },
+            { n: 2, rank: 'C>B>A' }
+        ]);
+        M.renderCriteriaChart(document.getElementById('chart'), {
+            AAW: true, CWC: false, UNAN: true, MONO: true, IIA: false
+        }, {
+            title: 'نمودار ازپیش‌آماده‌شده',
+            examples: [
+                {
+                    rule: 'CWC',
+                    title: 'امتیاز رتبه با پیروزی دونفره یکی نیست',
+                    ballots: [M.ballotChip(2, 'A>B>C'), M.ballotChip(2, 'B>C>A'), M.ballotChip(2, 'C>B>A')],
+                    result: 'کندورسه C است. بوردا امتیاز B را بالاتر می‌برد چون B در برگه‌ها وسط یا اول است.',
+                    why: 'جمع امتیاز، معیار کندورسه را تضمین نمی‌کند.'
+                },
+                {
+                    rule: 'IIA',
+                    title: 'جابه‌جایی C امتیاز A و B را عوض می‌کند',
+                    ballots: [M.ballotChip(3, 'A>B>C') + M.ballotChip(3, 'B>A>C'), M.ballotChip(3, 'A>C>B') + M.ballotChip(3, 'B>C>A')],
+                    result: 'A در برابر B در همهٔ برگه‌ها ثابت است؛ فقط جای C عوض شده و ترتیب امتیاز عوض می‌شود.',
+                    why: 'امتیازها به جای نامزد سوم وابسته‌اند.'
+                }
+            ]
+        });
+        const lab = M.createLab({
+            candidates: THREE,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const cands = lab.state.candidates;
+                const br = M.borda(lab.state.voters, cands);
+                const cw = counts ? M.hasCondorcet(counts, cands) : null;
+                if (br.scores) M.renderScoreBars(document.getElementById('bars'), br.scores, cands);
+                M.drawGraph(document.getElementById('graphCanvas'), counts, { candidates: cands, highlightWinner: br.winner });
+                const el = document.getElementById('out');
+                if (!lab.state.voters.length) { el.innerHTML = ''; return; }
+                el.innerHTML = `<div class="result-box win">برنده بوردا: ${br.winner}</div>` +
+                    (cw && cw !== br.winner ? `<div class="result-box loss">برنده کندورسه ${cw} بود.</div>` : '');
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => { lab.setCandidates(THREE); lab.setVoters(EXAMPLE, true); });
+        lab.setVoters(EXAMPLE, true);
+    </script>
+</body>
+</html>

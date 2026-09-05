@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Arrow's Theorem — Pivotal Voter Demo</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --font-primary: 'Vazirmatn', 'Estedad', 'Segoe UI', system-ui, sans-serif;
+            --bg: #060913;
+            --bg2: #0b1221;
+            --surface: 10, 17, 31;
+            --surface2: 16, 25, 44;
+            --text: #eef6ff;
+            --muted: #93a5c2;
+            --cyan: #39d3ff;
+            --cyan2: #67e8f9;
+            --amber: #f9b44a;
+            --green: #6ee7b7;
+            --rose: #ff5d7d;
+            --a: #d45d5d;
+            --b: #3d8c7a;
+            --c: #3b7fa8;
+        }
+
+        body {
+            font-family: var(--font-primary);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 18px;
+            background: radial-gradient(circle at 18% 8%, rgba(57, 211, 255, .14), transparent 34rem),
+                radial-gradient(circle at 84% 14%, rgba(249, 180, 74, .09), transparent 30rem),
+                linear-gradient(150deg, var(--bg), var(--bg2) 58%, #05070d);
+        }
+
+        .container {
+            max-width: 1500px;
+            margin: auto
+        }
+
+        header {
+            margin-bottom: 22px;
+            text-align: center;
+        }
+
+        .kicker {
+            font-size: 12px;
+            color: var(--cyan2);
+            font-weight: 800;
+            letter-spacing: .12em
+        }
+
+        h1 {
+            font-size: 44px;
+            font-weight: 800;
+            margin: 6px 0 4px;
+            letter-spacing: .01em;
+            background: linear-gradient(120deg, var(--cyan2) 0%, var(--text) 45%, var(--amber) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 40px rgba(57, 211, 255, .18);
+        }
+
+        h1::after {
+            content: '';
+            display: block;
+            width: 84px;
+            height: 4px;
+            margin: 14px auto 0;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--cyan2), var(--amber));
+            box-shadow: 0 0 16px rgba(57, 211, 255, .5);
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6
+        }
+
+        .card {
+            background: linear-gradient(150deg, rgba(var(--surface2), .84), rgba(var(--surface), .7));
+            border: 1px solid rgba(148, 163, 184, .16);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, .3);
+            backdrop-filter: blur(16px);
+            margin-bottom: 14px;
+            transition: border-color .25s, box-shadow .25s
+        }
+
+        .card:hover {
+            border-color: rgba(148, 163, 184, .28);
+            box-shadow: 0 22px 60px rgba(0, 0, 0, .38)
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        button {
+            font: inherit;
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--text);
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, .14);
+            border-radius: 10px;
+            padding: 9px 16px;
+            background: rgba(255, 255, 255, .06);
+            letter-spacing: .01em;
+            transition: transform .15s, background .2s, box-shadow .2s
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, .12);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, .25)
+        }
+
+        button.primary {
+            background: var(--cyan2);
+            color: #041019;
+            border-color: rgba(103, 232, 249, .5)
+        }
+
+        button.success {
+            background: var(--green);
+            color: #04241a
+        }
+
+        button.warning {
+            background: var(--amber);
+            color: #211505
+        }
+
+        button:active {
+            transform: scale(.97)
+        }
+
+        .legend {
+            margin-left: auto;
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        .pivot-note {
+            color: var(--amber);
+            font-weight: 800
+        }
+
+        .profile-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, .07)
+        }
+
+        .profile-title h2 {
+            font-size: 19px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .profile-title h2::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--cyan2), var(--amber));
+            box-shadow: 0 0 10px rgba(57, 211, 255, .6)
+        }
+
+        .result-badge {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            color: var(--green);
+            border: 1px solid rgba(110, 231, 183, .3);
+            background: rgba(110, 231, 183, .09);
+            font-weight: 800
+        }
+
+        .profile-row {
+            display: grid;
+            grid-template-columns: 78px repeat(10, minmax(80px, 1fr));
+            gap: 7px;
+            align-items: stretch;
+            margin-bottom: 8px
+        }
+
+        .row-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, .04);
+            border: 1px solid rgba(255, 255, 255, .09);
+            color: var(--cyan2);
+            font-weight: 800;
+            font-size: 12px
+        }
+
+        .voter {
+            min-width: 0;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, .09);
+            border-radius: 12px;
+            padding: 7px;
+            background: rgba(255, 255, 255, .025);
+            transition: transform .18s, border-color .2s, box-shadow .2s, background .2s
+        }
+
+        .voter:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, .2);
+            background: rgba(255, 255, 255, .045)
+        }
+
+        .voter.pivot-q {
+            border: 2px solid var(--rose);
+            box-shadow: 0 0 18px rgba(255, 93, 125, .18)
+        }
+
+        .voter.result-voter {
+            border: 2px solid var(--green);
+            background: rgba(110, 231, 183, .055);
+            box-shadow: 0 0 18px rgba(110, 231, 183, .10);
+        }
+
+        .voter.result-voter .voter-num {
+            color: var(--green);
+        }
+
+        .voter.result-voter .item {
+            cursor: default;
+        }
+
+        .voter.dragging-voter {
+            opacity: .35;
+            transform: scale(.98)
+        }
+
+        .voter.drag-over-voter {
+            border-color: var(--cyan);
+            box-shadow: 0 0 16px rgba(57, 211, 255, .16)
+        }
+
+        .voter-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px
+        }
+
+        .voter:not(.result-voter) .voter-head {
+            cursor: grab
+        }
+
+        .voter-num {
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 800
+        }
+
+        .tier-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-height: 188px
+        }
+
+        .rank-gap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 3px 0 4px;
+            pointer-events: none;
+            user-select: none;
+            color: rgba(147, 165, 194, .7);
+            font-size: 15px;
+            font-weight: 900;
+            line-height: .42;
+            letter-spacing: 0;
+        }
+
+        .item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            border-radius: 7px;
+            color: #fff;
+            font-weight: 900;
+            font-size: 17px;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            border: 1px solid rgba(255, 255, 255, .08);
+            transition: transform .15s, filter .15s, box-shadow .15s
+        }
+
+        .item:hover {
+            filter: brightness(1.12)
+        }
+
+        .item:active {
+            cursor: grabbing
+        }
+
+        .item.dragging {
+            opacity: .35;
+            transform: scale(.96)
+        }
+
+        .item.drag-over {
+            outline: 2px dashed var(--cyan);
+            outline-offset: 1px
+        }
+
+        .item.A {
+            background: var(--a)
+        }
+
+        .item.B {
+            background: var(--b)
+        }
+
+        .item.C {
+            background: var(--c)
+        }
+
+        .pivot-help {
+            margin-top: 9px;
+            padding: 9px 12px;
+            border-radius: 10px;
+            background: rgba(249, 180, 74, .07);
+            border: 1px solid rgba(249, 180, 74, .18);
+            font-size: 12px;
+            color: #fbd08a;
+            line-height: 1.6
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px
+        }
+
+        .result-card {
+            border: 1px solid rgba(255, 255, 255, .1);
+            border-radius: 14px;
+            padding: 14px;
+            background: rgba(255, 255, 255, .035)
+        }
+
+        .result-card.pivot-result {
+            border-color: rgba(110, 231, 183, .4);
+            box-shadow: 0 0 22px rgba(110, 231, 183, .07)
+        }
+
+        .result-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 9px
+        }
+
+        .result-head strong {
+            font-size: 15px
+        }
+
+        .result-label {
+            font-size: 11px;
+            color: var(--muted)
+        }
+
+        .result-ranking {
+            display: flex;
+            flex-direction: column;
+            gap: 5px
+        }
+
+        .result-rank {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 9px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, .04);
+            font-weight: 800
+        }
+
+        .result-rank .position {
+            width: 22px;
+            color: var(--muted)
+        }
+
+        .result-rank .chip {
+            width: 32px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .result-rank .chip.A {
+            background: var(--a)
+        }
+
+        .result-rank .chip.B {
+            background: var(--b)
+        }
+
+        .result-rank .chip.C {
+            background: var(--c)
+        }
+
+        .result-arrow {
+            margin: 5px 0;
+            color: var(--cyan2);
+            font-size: 12px;
+            text-align: center
+        }
+
+        .match {
+            color: var(--green);
+            font-size: 12px;
+            font-weight: 800;
+            margin-top: 7px
+        }
+
+        .explain {
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--muted)
+        }
+
+        .explain strong {
+            color: var(--text)
+        }
+
+        .q-graph-card {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, .07)
+        }
+
+        .q-graph-card h3 {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--cyan2);
+            margin-bottom: 10px;
+            text-align: center
+        }
+
+        .graph-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(2, 6, 23, .5);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            padding: 8px
+        }
+
+        .graph-wrap canvas {
+            width: 100%;
+            max-width: 420px;
+            height: auto;
+            aspect-ratio: 1/1;
+            display: block;
+            border-radius: 12px;
+            background: rgba(6, 9, 19, .6)
+        }
+
+        .graph-legend {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--muted);
+            flex-wrap: wrap
+        }
+
+        .graph-legend .dot {
+            display: inline-block;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, .15);
+            margin-left: 4px;
+            vertical-align: middle
+        }
+
+        /* ---- Animation enhancements ---------------------------------- */
+
+        .item {
+            will-change: transform
+        }
+
+        .voter.just-swapped {
+            animation: swapPulse .6s ease
+        }
+
+        @keyframes swapPulse {
+            0% {
+                border-color: var(--cyan2);
+                box-shadow: 0 0 0 rgba(57, 211, 255, 0);
+            }
+
+            35% {
+                border-color: var(--cyan2);
+                box-shadow: 0 0 22px rgba(57, 211, 255, .35);
+            }
+
+            100% {
+                border-color: rgba(255, 255, 255, .09);
+                box-shadow: 0 0 0 rgba(57, 211, 255, 0);
+            }
+        }
+
+        .voter.result-voter.result-changed {
+            animation: resultPulse .9s ease
+        }
+
+        @keyframes resultPulse {
+            0% {
+                border-color: var(--amber);
+                box-shadow: 0 0 0 rgba(249, 180, 74, 0);
+                background: rgba(249, 180, 74, .12)
+            }
+
+            40% {
+                border-color: var(--amber);
+                box-shadow: 0 0 26px rgba(249, 180, 74, .4);
+            }
+
+            100% {
+                border-color: var(--green);
+                box-shadow: 0 0 18px rgba(110, 231, 183, .10);
+                background: rgba(110, 231, 183, .055)
+            }
+        }
+
+        .voter.result-voter .item {
+            transition: transform .3s, filter .15s, box-shadow .3s
+        }
+
+        .card.card-enter {
+            animation: cardIn .5s cubic-bezier(.2, .8, .2, 1) backwards
+        }
+
+        .card.card-enter:nth-of-type(1) {
+            animation-delay: .02s
+        }
+
+        .card.card-enter:nth-of-type(2) {
+            animation-delay: .08s
+        }
+
+        .card.card-enter:nth-of-type(3) {
+            animation-delay: .14s
+        }
+
+        @keyframes cardIn {
+            0% {
+                opacity: 0;
+                transform: translateY(10px)
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .item.item-enter {
+            animation: itemIn .32s cubic-bezier(.2, .8, .2, 1)
+        }
+
+        @keyframes itemIn {
+            0% {
+                opacity: 0;
+                transform: scale(.85)
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1)
+            }
+        }
+
+        /* ---------------------------------------------------------------- */
+
+        @media(max-width:1050px) {
+            .profile-row {
+                grid-template-columns: 65px repeat(10, minmax(65px, 1fr));
+                overflow-x: auto
+            }
+
+            .profile-row>* {
+                min-width: 65px
+            }
+
+            .results {
+                grid-template-columns: 1fr
+            }
+
+            .legend {
+                width: 100%;
+                margin-left: 0
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="kicker" style="text-align:center">ناممکن‌بودن انتخاب اجتماعی</div>
+            <h1 style="text-align:center">Arrow's Theorem</h1>
+            <p class="subtitle" style="text-align:center;max-width:640px;margin:0 auto">
+                رأی‌دهندهٔ محوری را در هر پروفایل جابه‌جا کنید و ببینید چگونه نتیجهٔ رأی‌گیری تغییر می‌کند
+            </p>
+        </header>
+
+        <section class="card">
+            <div class="controls" style="justify-content:center">
+                <button id="reset">↺ بازنشانی</button>
+            </div>
+        </section>
+
+        <div id="profiles"></div>
+
+    </div>
+
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const N = 9;
+        const PIVOT_ID = 5; // identity of the pivotal voter (was: fixed column index 4)
+
+        // Explicit, hand-specified ranking for each voter in each profile
+        // (fixed — no randomness, no reshuffling on reset).
+        const profileOrders = {
+            0: ['BAC', 'BAC', 'BCA', 'BAC', 'CAB', 'ACB', 'ACB', 'CAB', 'ACB'], // Profile O
+            1: ['BAC', 'BAC', 'BCA', 'BAC', 'BCA', 'ACB', 'ACB', 'CAB', 'ACB'], // Profile P
+            2: ['BAC', 'BAC', 'BCA', 'BAC', 'BCA', 'ACB', 'ACB', 'CAB', 'ACB'], // Profile Q
+        };
+        const rawInitial = [0, 1, 2].map(pi => profileOrders[pi].map(s => s.split('')));
+
+        // Each voter now carries its own identity (id) alongside its ranking, so
+        // that when two voters are swapped, the id (and thus its "V#" label and
+        // pivot marking) travels with the ranking instead of staying pinned to the
+        // column position. This lets the pivotal voter end up in any column.
+        const initial = rawInitial.map(profile => profile.map((rank, vi) => ({ id: vi + 1, rank: [...rank] })));
+
+        let profiles = structuredClone(initial);
+        const names = ['Profile O', 'Profile P', 'Profile Q'];
+        let dragged = null;
+        const prevResultKey = {};
+        let interactionsBound = false;
+
+        function flipTo(el, oldRect) {
+            if (!el || !oldRect) return;
+            const now = el.getBoundingClientRect();
+            const dx = oldRect.left - now.left;
+            const dy = oldRect.top - now.top;
+            if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+            el.style.transition = 'none';
+            el.style.transform = `translate(${dx}px, ${dy}px)`;
+            requestAnimationFrame(() => {
+                el.style.transition = 'transform .38s cubic-bezier(.2,.8,.2,1)';
+                el.style.transform = '';
+            });
+        }
+
+        function reorderWithFlip(listEl, order) {
+            const items = [...listEl.querySelectorAll('.item')];
+            const oldRects = {};
+            items.forEach(el => { oldRects[el.dataset.candidate] = el.getBoundingClientRect(); });
+            order.forEach(c => {
+                const el = items.find(x => x.dataset.candidate === c);
+                if (el) listEl.appendChild(el);
+            });
+            ensureGaps(listEl);
+            items.forEach(el => flipTo(el, oldRects[el.dataset.candidate]));
+        }
+
+        function itemHTML(x, key, draggable) {
+            const drag = draggable === false ? 'false' : 'true';
+            return `<div class="item ${x}" draggable="${drag}" data-candidate="${x}" data-key="${key}">${x}</div>`;
+        }
+
+        function gapHTML() {
+            return `<div class="rank-gap" aria-hidden="true">·<br>·<br>·</div>`;
+        }
+
+        function tierHTML(rank, keyPrefix, draggable) {
+            return rank.map((c, i) =>
+                itemHTML(c, `${keyPrefix}-${c}`, draggable) + (i < rank.length - 1 ? gapHTML() : '')
+            ).join('');
+        }
+
+        function ensureGaps(listEl) {
+            if (!listEl) return;
+            listEl.querySelectorAll('.rank-gap').forEach(g => g.remove());
+            const items = [...listEl.querySelectorAll('.item')];
+            items.forEach((el, i) => {
+                if (i === items.length - 1) return;
+                el.insertAdjacentHTML('afterend', gapHTML());
+            });
+        }
+
+        function resultRankOf(pi) {
+            const profile = profiles[pi];
+            return (profile.find(v => v.id === PIVOT_ID) || profile[PIVOT_ID - 1]).rank;
+        }
+
+        function syncResult(pi) {
+            const rank = resultRankOf(pi);
+            const key = rank.join('');
+            const resultEl = document.querySelector(`#row-${pi} .result-voter`);
+            if (resultEl) {
+                reorderWithFlip(resultEl.querySelector('.tier-list'), rank);
+                const changed = prevResultKey[pi] !== undefined && prevResultKey[pi] !== key;
+                if (changed) {
+                    resultEl.classList.remove('result-changed');
+                    void resultEl.offsetWidth;
+                    resultEl.classList.add('result-changed');
+                }
+            }
+            prevResultKey[pi] = key;
+            if (pi === 2) drawQGraph();
+        }
+
+        function rowVoters(pi) {
+            return [...document.querySelectorAll(`#row-${pi} .voter:not(.result-voter)`)];
+        }
+
+        function swapVoterNodes(pi, from, to) {
+            const voters = rowVoters(pi);
+            const a = voters[from];
+            const b = voters[to];
+            if (!a || !b) return;
+            const oldA = a.getBoundingClientRect();
+            const oldB = b.getBoundingClientRect();
+            const marker = document.createElement('div');
+            a.replaceWith(marker);
+            b.replaceWith(a);
+            marker.replaceWith(b);
+            rowVoters(pi).forEach((v, i) => { v.dataset.voter = String(i); });
+            [a, b].forEach((el, i) => {
+                el.classList.remove('just-swapped');
+                void el.offsetWidth;
+                el.classList.add('just-swapped');
+                flipTo(el, i === 0 ? oldA : oldB);
+            });
+        }
+
+        function renderProfiles() {
+            const root = document.getElementById('profiles');
+            const firstPaint = !root.children.length;
+            root.innerHTML = '';
+
+            profiles.forEach((profile, pi) => {
+                const card = document.createElement('section');
+                card.className = firstPaint ? 'card card-enter' : 'card';
+
+                const votersHTML = profile.map((voter, vi) => `
+                    <div class="voter ${pi === 2 && voter.id === PIVOT_ID ? 'pivot-q' : ''}"
+                         data-profile="${pi}"
+                         data-voter="${vi}">
+                        <div class="voter-head" draggable="true">
+                            <span class="voter-num">V${voter.id}</span>
+                        </div>
+                        <div class="tier-list">${tierHTML(voter.rank, `v-${pi}-${voter.id}`)}</div>
+                    </div>
+                `).join('');
+
+                const resultRank = resultRankOf(pi);
+                prevResultKey[pi] = resultRank.join('');
+
+                card.innerHTML = `
+                    <div class="profile-title">
+                        <h2>${names[pi]}</h2>
+                    </div>
+
+                    <div class="controls" style="margin-bottom:10px">
+                        <button class="primary" data-btop="${pi}">↑ انتقال همهٔ B به بالا</button>
+                        <button class="success" data-bbottom="${pi}">↓ انتقال همهٔ B به پایین</button>
+                    </div>
+
+                    <div class="profile-row" id="row-${pi}">
+                        <div class="row-label">رأی‌دهندگان</div>
+                        ${votersHTML}
+
+                        <div class="voter result-voter">
+                            <div class="voter-head">
+                                <span class="voter-num">Result</span>
+                            </div>
+                            <div class="tier-list">
+                                ${tierHTML(resultRank, `r-${pi}`, false)}
+                            </div>
+                        </div>
+                    </div>
+                    ${pi === 2 ? `
+                    <div class="q-graph-card">
+                        <h3>گراف نتیجهٔ Profile Q</h3>
+                        <div class="graph-wrap">
+                            <canvas id="qGraph" width="480" height="480"></canvas>
+                        </div>
+                        <div class="graph-legend" id="qGraphLegend"></div>
+                    </div>` : ''}
+                `;
+
+                root.appendChild(card);
+            });
+
+            drawQGraph();
+        }
+
+        function drawQGraph() {
+            const M = window.Mentor;
+            const canvas = document.getElementById('qGraph');
+            if (!M || !canvas) return;
+            const cands = ['A', 'B', 'C'];
+            const rank = resultRankOf(2);
+            const counts = M.buildCounts([rank.join('>')], cands);
+            M.drawGraph(canvas, counts, {
+                candidates: cands,
+                highlightWinner: rank[0]
+            });
+            const legend = document.getElementById('qGraphLegend');
+            if (legend) legend.innerHTML = M.legendHtml(counts, { candidates: cands });
+        }
+
+        function bindInteractions() {
+            if (interactionsBound) return;
+            interactionsBound = true;
+            const root = document.getElementById('profiles');
+
+            root.addEventListener('dragstart', e => {
+                const item = e.target.closest('.item');
+                if (item) {
+                    if (item.closest('.result-voter')) {
+                        e.preventDefault();
+                        return;
+                    }
+                    dragged = item;
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', item.dataset.candidate);
+                    return;
+                }
+                const head = e.target.closest('.voter-head');
+                const voter = head && head.closest('.voter:not(.result-voter)');
+                if (!voter) return;
+                dragged = { type: 'voter', profile: +voter.dataset.profile, voter: +voter.dataset.voter };
+                voter.classList.add('dragging-voter');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', `voter-${voter.dataset.profile}-${voter.dataset.voter}`);
+            });
+
+            root.addEventListener('dragend', () => {
+                root.querySelectorAll('.item').forEach(x => x.classList.remove('dragging', 'drag-over'));
+                root.querySelectorAll('.voter').forEach(x => x.classList.remove('dragging-voter', 'drag-over-voter'));
+                dragged = null;
+            });
+
+            root.addEventListener('dragover', e => {
+                if (dragged && dragged.nodeType === 1) {
+                    const item = e.target.closest('.item');
+                    if (item && item !== dragged && item.parentElement === dragged.parentElement) {
+                        e.preventDefault();
+                        root.querySelectorAll('.item.drag-over').forEach(x => { if (x !== item) x.classList.remove('drag-over'); });
+                        item.classList.add('drag-over');
+                    }
+                    return;
+                }
+                if (dragged && dragged.type === 'voter') {
+                    const voter = e.target.closest('.voter:not(.result-voter)');
+                    if (!voter) return;
+                    if (+voter.dataset.profile === dragged.profile && +voter.dataset.voter !== dragged.voter) {
+                        e.preventDefault();
+                        root.querySelectorAll('.voter.drag-over-voter').forEach(x => { if (x !== voter) x.classList.remove('drag-over-voter'); });
+                        voter.classList.add('drag-over-voter');
+                    }
+                }
+            });
+
+            root.addEventListener('dragleave', e => {
+                const item = e.target.closest('.item');
+                if (item && !item.contains(e.relatedTarget)) item.classList.remove('drag-over');
+                const voter = e.target.closest('.voter');
+                if (voter && !voter.contains(e.relatedTarget)) voter.classList.remove('drag-over-voter');
+            });
+
+            root.addEventListener('drop', e => {
+                e.preventDefault();
+                if (dragged && dragged.nodeType === 1) {
+                    const el = e.target.closest('.item');
+                    if (!el || el === dragged) return;
+                    el.classList.remove('drag-over');
+                    const list = dragged.parentElement;
+                    if (list !== el.parentElement) return;
+                    const voterEl = list.closest('.voter');
+                    if (!voterEl || voterEl.classList.contains('result-voter')) return;
+                    const pi = +voterEl.dataset.profile;
+                    const vi = +voterEl.dataset.voter;
+                    const arr = profiles[pi][vi].rank;
+                    const a = arr.indexOf(dragged.dataset.candidate);
+                    const b = arr.indexOf(el.dataset.candidate);
+                    if (a < 0 || b < 0) return;
+                    arr.splice(a, 1);
+                    arr.splice(b, 0, dragged.dataset.candidate);
+                    reorderWithFlip(list, arr);
+                    syncResult(pi);
+                    return;
+                }
+                if (dragged && dragged.type === 'voter') {
+                    const voter = e.target.closest('.voter:not(.result-voter)');
+                    if (!voter) return;
+                    voter.classList.remove('drag-over-voter');
+                    const pi = +voter.dataset.profile;
+                    const from = dragged.voter;
+                    const to = +voter.dataset.voter;
+                    if (pi !== dragged.profile || from === to) return;
+                    [profiles[pi][from], profiles[pi][to]] = [profiles[pi][to], profiles[pi][from]];
+                    swapVoterNodes(pi, from, to);
+                }
+            });
+
+            root.addEventListener('click', e => {
+                const top = e.target.closest('[data-btop]');
+                const bot = e.target.closest('[data-bbottom]');
+            if (top) moveBRow(+top.dataset.btop, 'top');
+            if (bot) moveBRow(+bot.dataset.bbottom, 'bottom');
+            });
+        }
+
+        function moveBRow(pi, position) {
+            profiles[pi].forEach(voter => {
+                const rank = voter.rank;
+                const others = rank.filter(x => x !== 'B');
+                rank.splice(0, rank.length, ...(position === 'top' ? ['B', ...others] : [...others, 'B']));
+            });
+            rowVoters(pi).forEach((v, vi) => {
+                reorderWithFlip(v.querySelector('.tier-list'), profiles[pi][vi].rank);
+            });
+            syncResult(pi);
+        }
+
+        document.getElementById('reset').onclick = () => {
+            profiles = structuredClone(initial);
+            renderProfiles();
+        };
+
+        bindInteractions();
+        renderProfiles();
+    </script>
+</body>
+
+</html>

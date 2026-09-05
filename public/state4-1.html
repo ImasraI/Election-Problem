@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۴.۱ – وجود همیشگی برنده</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 4.1 · AAW</div>
+        <h2 class="cond-title">وجود همیشگی برنده</h2>
+        <div class="explain-panel">
+            <p>سیستم مطلوب باید برای هر مجموعه رأی ممکن، دست‌کم یک برنده معرفی کند.</p>
+            <p>نباید هیچ‌وقت بدون پاسخ بماند؛ حتی وقتی مقایسه‌های دونفره یک دور می‌سازند.</p>
+            <p>این شرط Always A Winner نام دارد. پارادوکس کندورسه نمونه‌ای است که در آن برندهٔ مطلق نیست.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span>نامزدها و آرا</span></div>
+            <div id="candBar"></div>
+            <div id="adder"></div>
+            <div class="row" style="margin-top:10px;">
+                <button class="outline" id="loadEx" type="button">مثال بدون برنده</button>
+                <button class="outline" id="resetBtn" type="button" style="color:#ff5d7d;">حذف همه</button>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header"><span>رأی‌دهندگان</span><span class="badge" id="voterCount">۰</span></div>
+                <div class="voter-list" id="voterList"></div>
+            </div>
+            <div class="card">
+                <div id="aawResult"></div>
+                <div class="graph-wrap" style="margin-top:10px;"><canvas id="graphCanvas" width="480" height="480"></canvas></div>
+                <div class="graph-legend" id="graphLegend"></div>
+                <div style="overflow-x:auto;margin-top:8px;"><table class="matrix-table" id="matrixTable"></table></div>
+            </div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const lab = M.createLab({
+            candidates: THREE,
+            keepParadox: true,
+            adderId: 'adder', candidateBarId: 'candBar', voterCountId: 'voterCount',
+            voterListId: 'voterList', resetBtnId: 'resetBtn',
+            matrixId: 'matrixTable', graphId: 'graphCanvas', legendId: 'graphLegend',
+            onRender(counts) {
+                const box = document.getElementById('aawResult');
+                if (!counts) { box.innerHTML = '<div class="empty-state">رأی اضافه کنید.</div>'; return; }
+                const method = M.condorcetMethod(lab.state.voters, lab.state.candidates);
+                if (method.winner) {
+                    box.innerHTML = `<div class="result-box win">در این نمونه برنده هست: ${method.winner}. شرط AAW یعنی این برای هر آرایی درست باشد، نه فقط برای یک نمونه.</div>`;
+                } else {
+                    box.innerHTML = `<div class="result-box loss">مقایسه دوبه‌دو پاسخی نمی‌دهد. پس این روش شرط «همیشه برنده» را نقض می‌کند.</div>`;
+                }
+            }
+        });
+        document.getElementById('loadEx').addEventListener('click', () => {
+            lab.setVoters(M.cyclicVoters(THREE), true);
+        });
+        lab.setVoters(M.cyclicVoters(THREE), true);
+    </script>
+</body>
+</html>

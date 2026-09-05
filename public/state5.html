@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۵ – سنجش ایده‌ها</title>
+    <link rel="stylesheet" href="shared.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 5</div>
+        <h2 class="cond-title">ایده‌ها را با پنج شرط بسنجید</h2>
+        <div class="explain-panel">
+            <p>هر روش با پنج شرط ارو ارزیابی می‌شود: همیشه برنده، کندورسه، اجماع، یکنوایی، استقلال.</p>
+            <p>منتور می‌تواند ایده‌های استیت ۱ را برای کلاس ارزیابی کند.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>ارسال روش (هر نفر یک بار)</span>
+                <span class="badge" id="ideaCount">۰ ایده</span>
+            </div>
+            <textarea id="ideaInput" placeholder="روش رأی‌گیری خود را بنویسید"></textarea>
+            <div class="row" style="margin-top:10px;">
+                <button class="primary" id="addIdeaBtn" type="button">ثبت و ارزیابی</button>
+                <button class="outline" id="examplesBtn" type="button">مثال‌های نقض</button>
+            </div>
+            <div id="evalStatus" class="text-muted" style="margin-top:10px;"></div>
+            <div id="criteriaChart"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>ایده‌های استیت ۱</span>
+                <span class="badge" id="state1Count">۰ ایده</span>
+                <button class="outline reveal-names-btn hidden" id="revealNamesBtn" type="button">نمایش نام‌ها</button>
+            </div>
+            <p class="idea-note">این همان ایده‌هایی است که در استیت ۱ نوشته شده. Mentor می‌تواند هر کدام را ارزیابی کند تا برای رأی‌دهنده‌ها امتیاز و نمودار پنج شرط ساخته شود.</p>
+            <div id="state1List"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><span>روش‌های ارزیابی‌شده</span></div>
+            <div id="ideaList"></div>
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const input = document.getElementById('ideaInput');
+        const list = document.getElementById('ideaList');
+        const state1List = document.getElementById('state1List');
+        const count = document.getElementById('ideaCount');
+        const state1Count = document.getElementById('state1Count');
+        const statusEl = document.getElementById('evalStatus');
+        const chartEl = document.getElementById('criteriaChart');
+        const addBtn = document.getElementById('addIdeaBtn');
+        const examplesBtn = document.getElementById('examplesBtn');
+        let ideas = [];
+        let state1Ideas = [];
+        let selectedId = '';
+        let me = null;
+        let processingId = '';
+        let namesRevealed = false;
+
+        function isStaff(user) {
+            return M.isStaffUser(user);
+        }
+        function showName(item) {
+            const isOwn = me && item.username === me.username;
+            return M.maskedName(item.name || item.username, namesRevealed && isStaff(me), isOwn);
+        }
+        function who(idea) {
+            const namePart = namesRevealed && isStaff(me)
+                ? (idea.name || idea.username || '')
+                : (me && idea.username === me.username ? (idea.name || idea.username || '') : '●●●●');
+            return `${namePart} · ${idea.team || 'بدون تیم'} · ${idea.points || 0} امتیاز`;
+        }
+        function quotaUsed() {
+            return !!(me && me.role === 'student' && me.used_state5);
+        }
+        function hasFailed(idea) {
+            if (!idea || !idea.criteria || idea.criteria.valid === false) return false;
+            return Object.entries(idea.criteria).some(([k, v]) => k !== 'valid' && !v);
+        }
+        function alreadyScored(item) {
+            if (!item) return false;
+            if (item.evaluated_id) return false;
+            return ideas.some(idea => idea.username === item.username);
+        }
+        function canDelete(item) {
+            if (!me || !item) return false;
+            return isStaff(me) || item.username === me.username;
+        }
+        function deleteBtn(id, source) {
+            if (!id) return '';
+            return `<button class="outline idea-del" type="button" data-del="${M.escapeHtml(id)}" data-source="${source}">حذف</button>`;
+        }
+
+        function currentIdea() {
+            if (selectedId) {
+                const hit = ideas.find(item => item.id === selectedId);
+                if (hit) return hit;
+            }
+            return ideas.length ? ideas[ideas.length - 1] : null;
+        }
+
+        function upsertIdea(idea) {
+            if (!idea || !idea.id) return;
+            const idx = ideas.findIndex(item => item.id === idea.id);
+            if (idx >= 0) ideas[idx] = Object.assign({}, ideas[idx], idea);
+            else ideas = ideas.concat([idea]);
+            selectedId = idea.id;
+        }
+
+        function showChart(idea) {
+            if (!idea || !idea.criteria) {
+                M.renderCriteriaChart(chartEl, null, { empty: 'یک روش را ارزیابی کنید تا نمودار پنج شرط دیده شود.' });
+                return;
+            }
+            M.renderCriteriaChart(chartEl, idea.criteria, {
+                title: who(idea) + ' — «' + String(idea.text || '').slice(0, 48) + (String(idea.text || '').length > 48 ? '…' : '') + '»',
+                examples: idea.examples || [],
+                examplesFailed: !!(idea.examplesLoaded && !(idea.examples || []).length)
+            });
+        }
+
+        function selectScored(index) {
+            const idea = ideas[index];
+            if (!idea) return;
+            selectedId = idea.id;
+            showChart(idea);
+            render();
+        }
+
+        function renderState1() {
+            state1Count.textContent = state1Ideas.length + ' ایده';
+            const revealBtn = document.getElementById('revealNamesBtn');
+            if (revealBtn) {
+                revealBtn.classList.toggle('hidden', !isStaff(me));
+                revealBtn.textContent = namesRevealed ? 'مخفی کردن نام‌ها' : 'نمایش نام‌ها';
+            }
+            if (!state1Ideas.length) {
+                state1List.innerHTML = '<div class="empty-state">هنوز ایده‌ای در استیت ۱ ثبت نشده است.</div>';
+                return;
+            }
+            const staff = isStaff(me);
+            state1List.innerHTML = state1Ideas.map((item, i) => {
+                const scored = alreadyScored(item);
+                const done = !!(item.evaluated_id || item.processed);
+                let action = '';
+                if (done) {
+                    action = '<span class="badge condorcet">ارزیابی شد</span>';
+                } else if (scored) {
+                    action = '<span class="badge cycle">سهمیه استیت ۵ استفاده شده</span>';
+                } else if (staff) {
+                    const busy = processingId === item.id;
+                    action = `<button class="primary" type="button" data-process="${M.escapeHtml(item.id)}" ${busy || processingId ? 'disabled' : ''}>${busy ? 'در حال ارزیابی…' : 'ارزیابی برای کلاس'}</button>`;
+                } else {
+                    action = '<span class="badge">در انتظار Mentor</span>';
+                }
+                const linked = done && currentIdea() && currentIdea().id === item.evaluated_id;
+                const del = canDelete(item) ? deleteBtn(item.id, 'state1') : '';
+                return `
+                <div class="idea-item ${linked ? 'active' : ''}" data-s1="${i}">
+                    <span class="badge">${i + 1}</span>
+                    <div class="idea-text">
+                        <strong>${showName(item)}</strong>
+                        <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
+                        <div>${M.escapeHtml(item.text || '')}</div>
+                    </div>
+                    <div class="idea-actions">${action}${del}</div>
+                </div>`;
+            }).join('');
+            state1List.querySelectorAll('[data-s1]').forEach(row => {
+                row.addEventListener('click', () => {
+                    const item = state1Ideas[parseInt(row.dataset.s1, 10)];
+                    if (!item || !item.evaluated_id) return;
+                    const idx = ideas.findIndex(idea => idea.id === item.evaluated_id);
+                    if (idx >= 0) selectScored(idx);
+                });
+            });
+            state1List.querySelectorAll('[data-process]').forEach(btn => {
+                btn.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    processState1(btn.getAttribute('data-process'));
+                });
+            });
+            bindDeleteButtons(state1List);
+        }
+
+        function render() {
+            count.textContent = ideas.length + ' ایده';
+            const idea = currentIdea();
+            if (idea) selectedId = idea.id;
+            addBtn.disabled = quotaUsed() || !!processingId;
+            input.disabled = quotaUsed();
+            if (quotaUsed() && !processingId) {
+                statusEl.textContent = statusEl.textContent || 'سهمیه ارسال شما استفاده شده است.';
+            }
+            renderState1();
+            if (!ideas.length) {
+                list.innerHTML = '<div class="empty-state">هنوز کسی روشی نفرستاده است.</div>';
+                if (!processingId) {
+                    M.renderCriteriaChart(chartEl, null, { empty: 'هنوز ایده‌ای ارزیابی نشده است.' });
+                }
+                examplesBtn.disabled = true;
+                return;
+            }
+            list.innerHTML = ideas.map((item, i) => `
+                <div class="idea-item ${item.id === selectedId ? 'active' : ''}" data-select="${i}">
+                    <span class="badge">${i + 1}</span>
+                    <div class="idea-text">
+                        <strong>${showName(item)}</strong>
+                        <span class="text-muted"> · ${M.escapeHtml(item.team || 'بدون تیم')}</span>
+                        <div>${M.escapeHtml(item.text || '')}</div>
+                    </div>
+                    <div class="idea-actions">
+                            <span class="badge ${item.criteria && item.criteria.valid === false ? 'cycle' : (item.criteria && Object.entries(item.criteria).filter(([k]) => k !== 'valid').every(([, v]) => v) ? 'condorcet' : 'cycle')}">
+                                ${item.criteria && item.criteria.valid === false ? 'روش نیست' : ((item.points || 0) + ' امتیاز')}
+                            </span>
+                        ${canDelete(item) ? deleteBtn(item.id, 'state5') : ''}
+                    </div>
+                </div>`).join('');
+            list.querySelectorAll('[data-select]').forEach(row => {
+                row.addEventListener('click', () => {
+                    selectScored(parseInt(row.dataset.select, 10));
+                });
+            });
+            bindDeleteButtons(list);
+            const canEx = hasFailed(idea) && me && (isStaff(me) || idea.username === me.username);
+            examplesBtn.disabled = !canEx || !!processingId;
+            if (!processingId) showChart(idea);
+        }
+
+        async function addAndEvaluate() {
+            const t = input.value.trim();
+            if (!t) {
+                statusEl.textContent = 'روش را بنویسید.';
+                return;
+            }
+            addBtn.disabled = true;
+            examplesBtn.disabled = true;
+            statusEl.textContent = 'در حال ارزیابی پنج معیار…';
+            try {
+                const data = await Workshop.request('POST', '/api/evaluate', { prompt: t });
+                const idea = data.idea;
+                if (idea.criteria && idea.criteria.valid === false) {
+                    statusEl.textContent = 'این متن یک روش رأی‌گیری نیست. امتیاز: ۰';
+                } else if (hasFailed(idea)) {
+                    statusEl.textContent = `ثبت شد: ${idea.points} امتیاز. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.`;
+                } else {
+                    statusEl.textContent = `ثبت شد: ${idea.points} امتیاز. هر پنج شرط برقرار است.`;
+                }
+                input.value = '';
+                if (me) {
+                    me.used_state5 = true;
+                    me.points = idea.total_points || me.points;
+                }
+                upsertIdea(idea);
+                showChart(idea);
+                render();
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+                addBtn.disabled = quotaUsed();
+            }
+        }
+
+        async function processState1(id) {
+            if (!id || processingId) return;
+            processingId = id;
+            statusEl.textContent = 'در حال ارزیابی ایده استیت ۱…';
+            render();
+            try {
+                const data = await Workshop.request('POST', '/api/state1/evaluate', { id });
+                const idea = data.idea;
+                if (idea.criteria && idea.criteria.valid === false) {
+                    statusEl.textContent = 'این متن یک روش رأی‌گیری نیست. امتیاز: ۰';
+                } else if (hasFailed(idea)) {
+                    statusEl.textContent = `ارزیابی شد: ${idea.points} امتیاز. برای مثال نقض، دکمه «مثال‌های نقض» را بزنید.`;
+                } else {
+                    statusEl.textContent = `ارزیابی شد: ${idea.points} امتیاز. هر پنج شرط برقرار است.`;
+                }
+                if (me && idea.username === me.username) {
+                    me.used_state5 = true;
+                    me.points = idea.total_points || me.points;
+                }
+                upsertIdea(idea);
+                showChart(idea);
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            } finally {
+                processingId = '';
+                render();
+            }
+        }
+
+        async function loadExamples() {
+            const idea = currentIdea();
+            if (!hasFailed(idea)) {
+                statusEl.textContent = 'ابتدا روشی را ارزیابی کنید که دست‌کم یک شرط نقض‌شده داشته باشد.';
+                return;
+            }
+            examplesBtn.disabled = true;
+            addBtn.disabled = true;
+            statusEl.textContent = 'در حال گرفتن مثال‌های نقض…';
+            try {
+                const data = await Workshop.request('POST', '/api/examples', {
+                    id: idea.id,
+                    prompt: idea.text,
+                    criteria: idea.criteria
+                });
+                const updated = data.idea || idea;
+                if (data.examples) updated.examples = data.examples;
+                updated.examplesLoaded = true;
+                upsertIdea(updated);
+                showChart(updated);
+                statusEl.textContent = (updated.examples || []).length ? 'مثال‌های نقض آماده است.' : 'برای شرط‌های نقض‌شده مثالی برنگشت.';
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            } finally {
+                render();
+            }
+        }
+
+        addBtn.addEventListener('click', addAndEvaluate);
+        examplesBtn.addEventListener('click', loadExamples);
+
+        function bindDeleteButtons(root) {
+            root.querySelectorAll('[data-del]').forEach(btn => {
+                btn.addEventListener('click', ev => {
+                    ev.stopPropagation();
+                    deleteIdea(btn.getAttribute('data-del'), btn.getAttribute('data-source') || '');
+                });
+            });
+        }
+
+        async function deleteIdea(id, source) {
+            if (!id) return;
+            if (!confirm('این ایده حذف شود؟')) return;
+            statusEl.textContent = 'در حال حذف…';
+            try {
+                const data = await Workshop.request('POST', '/api/ideas/delete', { id, source });
+                if (source === 'state1') {
+                    const gone = state1Ideas.find(item => item.id === id);
+                    state1Ideas = state1Ideas.filter(item => item.id !== id);
+                    if (gone && gone.evaluated_id) {
+                        ideas = ideas.filter(item => item.id !== gone.evaluated_id);
+                        if (selectedId === gone.evaluated_id) selectedId = '';
+                    }
+                } else {
+                    ideas = ideas.filter(item => item.id !== id);
+                    if (selectedId === id) selectedId = '';
+                    state1Ideas = state1Ideas.map(item => {
+                        if (item.evaluated_id !== id && item.id !== id) return item;
+                        const next = Object.assign({}, item);
+                        delete next.evaluated_id;
+                        next.processed = false;
+                        return next;
+                    });
+                }
+                if (data && data.me) me = Object.assign({}, me || {}, data.me);
+                statusEl.textContent = 'ایده حذف شد.';
+                render();
+            } catch (err) {
+                statusEl.textContent = err.message || String(err);
+            }
+        }
+
+        document.getElementById('revealNamesBtn').addEventListener('click', () => {
+            namesRevealed = !namesRevealed;
+            render();
+        });
+
+        Workshop.startPolling((data, changed) => {
+            me = data.me;
+            ideas = data.ideas || [];
+            state1Ideas = data.state1_ideas || [];
+            if (!selectedId && me) {
+                const mine = ideas.find(item => item.username === me.username);
+                if (mine) selectedId = mine.id;
+            }
+            if (changed) render();
+        });
+    </script>
+</body>
+</html>

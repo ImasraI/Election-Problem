@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa" data-public-page="1">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>استیت ۴.۴ – یکنوایی</title>
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+        .mono-change {
+            margin: 16px 0 0;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px dashed rgba(249, 180, 74, .55);
+            background: rgba(249, 180, 74, .08);
+            text-align: center;
+            line-height: 1.85;
+        }
+        .mono-shift {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            direction: ltr;
+            margin: 8px 0;
+        }
+        .mono-shift .arrow { color: var(--c-amber); font-size: 22px; font-weight: 800; }
+        .stack-row, .ballot-group, .voter-item .rank, .mono-shift {
+            direction: ltr;
+            unicode-bidi: isolate;
+        }
+        .stack-row { margin: 8px 0 10px; line-height: 2.1; }
+        .voter-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+        .voter-table td:first-child { direction: ltr; unicode-bidi: isolate; }
+        .voter-table th, .voter-table td {
+            text-align: center; padding: 8px 6px;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+        }
+        .voter-table th { color: var(--c-muted); font-size: 12px; }
+        .voter-table tr.changed td { background: rgba(249, 180, 74, .16); }
+        .all-voters { margin-top: 10px; }
+        .all-voters .voter-item { cursor: default; padding: 6px 10px; }
+        .bars-label {
+            font-size: 12px; color: var(--c-muted); font-weight: 700; margin: 10px 0 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="section-kicker">STATE 4.4 · MONO</div>
+        <h2 class="cond-title">یکنوایی</h2>
+        <div class="explain-panel">
+            <p>اگر A برنده باشد و بعضی رأی‌دهندگان فقط A را بالاتر بگذارند — بدون عوض شدن ترتیب بقیه — A باید همچنان برنده بماند.</p>
+            <p>روش حذف تدریجی (Hare) این شرط را نقض می‌کند: در هر دور فقط رأی اول شمرده می‌شود و کم‌رأی‌ترین حذف می‌گردد.</p>
+        </div>
+
+        <div class="result-box loss">مثال نقض: A برنده است. یک نفر A را بالاتر می‌گذارد. A می‌بازد.</div>
+
+        <div class="side-compare" style="margin-top:16px;">
+            <div class="compare-col">
+                <h3>قبل — ۱۱ رأی</h3>
+                <div class="card-header"><span>حذف تدریجی</span><span class="badge condorcet">برنده: A</span></div>
+                <div class="stack-row" id="beforeStack"></div>
+                <table class="voter-table" id="beforeTable"></table>
+                <div class="all-voters">
+                    <div class="card-header"><span>همهٔ رأی‌دهندگان و رأی اولشان</span><span class="badge">۱۱</span></div>
+                    <div class="voter-list" id="beforeList"></div>
+                </div>
+                <div class="bars-label">ارزش رأی اول در دور نخست</div>
+                <div id="beforeBars"></div>
+                <div id="beforeRounds"></div>
+                <div class="result-box win">برنده: A</div>
+            </div>
+            <div class="compare-col">
+                <h3>بعد — همان ۱۱ نفر؛ فقط رأی ۵ عوض شده</h3>
+                <div class="card-header"><span>حذف تدریجی</span><span class="badge cycle">برنده: C</span></div>
+                <div class="stack-row" id="afterStack"></div>
+                <table class="voter-table" id="afterTable"></table>
+                <div class="all-voters">
+                    <div class="card-header"><span>همهٔ رأی‌دهندگان و رأی اولشان</span><span class="badge">۱۱</span></div>
+                    <div class="voter-list" id="afterList"></div>
+                </div>
+                <div class="bars-label">ارزش رأی اول در دور نخست</div>
+                <div id="afterBars"></div>
+                <div id="afterRounds"></div>
+                <div class="result-box loss">برنده: C</div>
+            </div>
+        </div>
+
+        <div class="mono-change">
+            فقط رأی‌دهندهٔ شماره ۵ به‌جای
+            <div class="mono-shift">
+                <span id="fromChip"></span>
+                <span class="arrow">→</span>
+                <span id="toChip"></span>
+            </div>
+            A را از جایگاه سوم به اول برد. بقیهٔ ۱۰ رأی دست‌نخورده‌اند. با وجود حمایت بیشتر، A دیگر برنده نیست.
+        </div>
+    </div>
+    <script src="shared.js"></script>
+    <script src="workshop.js"></script>
+    <script>
+        const M = Mentor;
+        const THREE = ['A', 'B', 'C'];
+        const beforeVoters = M.expandGroups([
+            { n: 4, rank: 'A>B>C' },
+            { n: 4, rank: 'B>C>A' },
+            { n: 3, rank: 'C>A>B' }
+        ]);
+        const afterVoters = beforeVoters.slice();
+        afterVoters[4] = 'A>B>C';
+
+        const GROUPS_BEFORE = [
+            { n: 4, rank: 'A>B>C', first: 'A', note: 'ثابت' },
+            { n: 4, rank: 'B>C>A', first: 'B', note: 'یکی از این‌ها عوض می‌شود', changed: true },
+            { n: 3, rank: 'C>A>B', first: 'C', note: 'ثابت' }
+        ];
+        const GROUPS_AFTER = [
+            { n: 5, rank: 'A>B>C', first: 'A', note: '+۱ (رأی ۵)', changed: true },
+            { n: 3, rank: 'B>C>A', first: 'B', note: '−۱' },
+            { n: 3, rank: 'C>A>B', first: 'C', note: 'ثابت' }
+        ];
+
+        function stackHtml(groups) {
+            return groups.map(g => M.ballotChip(g.n, g.rank)).join(' ');
+        }
+
+        function tableHtml(groups) {
+            const rows = groups.map(g => {
+                const cls = g.changed ? ' class="changed"' : '';
+                return `<tr${cls}>
+                    <td>${M.ballotChip(g.n, g.rank)}</td>
+                    <td><strong>${g.n}</strong></td>
+                    <td style="color:${M.candidateColor(g.first)};font-weight:800;">${g.first}</td>
+                    <td>${g.note}</td>
+                </tr>`;
+            }).join('');
+            return `<thead><tr><th>ترتیب کامل</th><th>تعداد</th><th>رأی اول</th><th>تغییر</th></tr></thead><tbody>${rows}</tbody>`;
+        }
+
+        function roundsHtml(hr) {
+            return (hr.rounds || []).map(r => {
+                const votes = (r.active || []).map(c =>
+                    `<span class="cand-vote">${c}: <span class="count">${r.counts[c] || 0}</span></span>`
+                ).join('');
+                let tail = '';
+                if (r.eliminatedThis) {
+                    const min = Math.min.apply(null, (r.active || []).map(c => r.counts[c] || 0));
+                    const tied = (r.active || []).filter(c => (r.counts[c] || 0) === min);
+                    tail = tied.length > 1
+                        ? `<div class="eliminated">تساوی ${tied.join(' و ')} در آخر؛ حذف ${r.eliminatedThis} (اول الفبا)</div>`
+                        : `<div class="eliminated">حذف کم‌رأی‌ترین: ${r.eliminatedThis}</div>`;
+                } else if (r.winner) {
+                    tail = `<div class="winner">برنده: ${r.winner}</div>`;
+                }
+                return `<div class="round-display">
+                    <div class="round-title">دور ${r.round} — باقی‌مانده: ${(r.active || []).join('، ')}</div>
+                    <div class="votes">${votes}</div>
+                    ${tail}
+                </div>`;
+            }).join('');
+        }
+
+        function listHtml(voters, changedIdx) {
+            return voters.map((rank, i) => {
+                const first = M.parseRanking(rank)[0];
+                const mark = i === changedIdx ? ' style="border-color:#f9b44a;background:rgba(249,180,74,.12);"' : '';
+                const tag = i === changedIdx ? ' <span class="highlight-up">رأی عوض‌شده</span>' : '';
+                return `<div class="voter-item"${mark}>
+                    <span class="rank">#${i + 1} &nbsp; ${M.formatRank(rank)}${tag}</span>
+                    <span style="color:${M.candidateColor(first)};font-weight:800;">رأی اول: ${first}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function paint(side, voters, groups, changedIdx) {
+            const hr = M.hare(voters, THREE);
+            const pl = M.plurality(voters, THREE);
+            document.getElementById(side + 'Stack').innerHTML = stackHtml(groups);
+            document.getElementById(side + 'Table').innerHTML = tableHtml(groups);
+            M.renderScoreBars(document.getElementById(side + 'Bars'), pl.counts, THREE);
+            document.getElementById(side + 'Rounds').innerHTML = roundsHtml(hr);
+            document.getElementById(side + 'List').innerHTML = listHtml(voters, changedIdx);
+        }
+
+        document.getElementById('fromChip').outerHTML = M.ballotChip(1, 'B>C>A');
+        document.getElementById('toChip').outerHTML = M.ballotChip(1, 'A>B>C');
+        paint('before', beforeVoters, GROUPS_BEFORE, 4);
+        paint('after', afterVoters, GROUPS_AFTER, 4);
+    </script>
+</body>
+</html>
